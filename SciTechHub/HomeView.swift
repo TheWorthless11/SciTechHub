@@ -79,6 +79,26 @@ struct HomeView: View {
                         .padding(.top, 10)
                     
                     VStack(spacing: 16) {
+                        // Navigate to News View
+                        NavigationLink(destination: NewsView()) {
+                            HStack(spacing: 15) {
+                                Text("📰")
+                                    .font(.title2)
+                                
+                                Text("Trending News")
+                                    .font(.headline)
+                                    .foregroundColor(.primary)
+                                
+                                Spacer()
+                                
+                                Image(systemName: "chevron.right")
+                                    .foregroundColor(.gray)
+                            }
+                            .padding()
+                            .background(Color.orange.opacity(0.1))
+                            .cornerRadius(12)
+                        }
+                        
                         NavigationLink(destination: BookmarkView()) {
                             HStack(spacing: 15) {
                                 Text("❤️")
