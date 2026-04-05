@@ -20,11 +20,17 @@ func application(_ application: UIApplication,
 @main
 struct SciTechHubApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
-    var body: some Scene {
-        WindowGroup {
-          NavigationView {
-            ContentView()
-          }
+    @StateObject var authViewModel = AuthViewModel()
+        
+
+        var body: some Scene {
+            WindowGroup {
+                if authViewModel.isSignedIn {
+                    HomeView()
+                } else {
+                    AuthView()
+                        .environmentObject(authViewModel)
+                }
+            }
         }
-      }
     }

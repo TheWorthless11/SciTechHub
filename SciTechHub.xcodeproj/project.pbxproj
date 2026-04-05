@@ -7,6 +7,11 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0B4EA2EE2F82079000822414 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B4EA2ED2F82079000822414 /* AuthView.swift */; };
+		0B4EA2F02F8209A900822414 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B4EA2EF2F8209A900822414 /* AuthViewModel.swift */; };
+		0B4EA2F22F820BC500822414 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B4EA2F12F820BC500822414 /* HomeView.swift */; };
+		0BA3A7E92F821E080093599C /* TopicListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA3A7E82F821E080093599C /* TopicListView.swift */; };
+		0BA3A7EB2F821F7A0093599C /* topics.json in Resources */ = {isa = PBXBuildFile; fileRef = 0BA3A7EA2F821F7A0093599C /* topics.json */; };
 		0BCE42ED2F81ED7E0000A45B /* SciTechHubApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BCE42EC2F81ED7E0000A45B /* SciTechHubApp.swift */; };
 		0BCE42EF2F81ED7E0000A45B /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BCE42EE2F81ED7E0000A45B /* ContentView.swift */; };
 		0BCE42F12F81ED840000A45B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 0BCE42F02F81ED840000A45B /* Assets.xcassets */; };
@@ -38,6 +43,11 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0B4EA2ED2F82079000822414 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
+		0B4EA2EF2F8209A900822414 /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
+		0B4EA2F12F820BC500822414 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
+		0BA3A7E82F821E080093599C /* TopicListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopicListView.swift; sourceTree = "<group>"; };
+		0BA3A7EA2F821F7A0093599C /* topics.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = topics.json; sourceTree = "<group>"; };
 		0BCE42E92F81ED7E0000A45B /* SciTechHub.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SciTechHub.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		0BCE42EC2F81ED7E0000A45B /* SciTechHubApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SciTechHubApp.swift; sourceTree = "<group>"; };
 		0BCE42EE2F81ED7E0000A45B /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
@@ -82,6 +92,8 @@
 		0BCE42E02F81ED7E0000A45B = {
 			isa = PBXGroup;
 			children = (
+				0BA3A7EA2F821F7A0093599C /* topics.json */,
+				0BA3A7E82F821E080093599C /* TopicListView.swift */,
 				0BCE42EB2F81ED7E0000A45B /* SciTechHub */,
 				0BCE42FC2F81ED850000A45B /* SciTechHubTests */,
 				0BCE43062F81ED850000A45B /* SciTechHubUITests */,
@@ -107,6 +119,9 @@
 				0BCE42EE2F81ED7E0000A45B /* ContentView.swift */,
 				0BCE42F02F81ED840000A45B /* Assets.xcassets */,
 				0BCE42F22F81ED840000A45B /* Preview Content */,
+				0B4EA2ED2F82079000822414 /* AuthView.swift */,
+				0B4EA2EF2F8209A900822414 /* AuthViewModel.swift */,
+				0B4EA2F12F820BC500822414 /* HomeView.swift */,
 			);
 			path = SciTechHub;
 			sourceTree = "<group>";
@@ -249,6 +264,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				0BCE42F42F81ED840000A45B /* Preview Assets.xcassets in Resources */,
+				0BA3A7EB2F821F7A0093599C /* topics.json in Resources */,
 				0BCE43172F81EFB20000A45B /* GoogleService-Info.plist in Resources */,
 				0BCE42F12F81ED840000A45B /* Assets.xcassets in Resources */,
 			);
@@ -275,8 +291,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0B4EA2F02F8209A900822414 /* AuthViewModel.swift in Sources */,
 				0BCE42EF2F81ED7E0000A45B /* ContentView.swift in Sources */,
+				0BA3A7E92F821E080093599C /* TopicListView.swift in Sources */,
 				0BCE42ED2F81ED7E0000A45B /* SciTechHubApp.swift in Sources */,
+				0B4EA2F22F820BC500822414 /* HomeView.swift in Sources */,
+				0B4EA2EE2F82079000822414 /* AuthView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -435,6 +455,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SciTechHub/Preview Content\"";
+				DEVELOPMENT_TEAM = GTX5U2JS8Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -442,6 +463,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -463,6 +485,7 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SciTechHub/Preview Content\"";
+				DEVELOPMENT_TEAM = GTX5U2JS8Q;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -470,6 +493,7 @@
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
