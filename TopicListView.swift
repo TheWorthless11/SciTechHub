@@ -9,7 +9,7 @@ import Foundation
 import SwiftUI
 
 // MARK: - 1. Model
-struct Topic: Codable, Identifiable {
+struct Topic: Codable, Identifiable, Equatable {
     let id: String
     let title: String
     let description: String
@@ -77,6 +77,9 @@ struct TopicListView: View {
 struct TopicDetailView: View {
     let topic: Topic // Received from TopicListView
     
+    // Connect to our global BookmarkManager
+    @EnvironmentObject var bookmarkManager: BookmarkManager
+    
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
@@ -101,5 +104,13 @@ struct TopicDetailView: View {
         }
         .navigationTitle(topic.title)
         .navigationBarTitleDisplayMode(.inline)
+        // Add the Bookmark button to the top right of the screen
+        .navigationBarItems(trailing: Button(action: {
+            bookmarkManager.toggleBookmark(topic: topic)
+        }) {
+            Image(systemName: bookmarkManager.isBookmarked(topic: topic) ? "heart.fill" : "heart")
+                .foregroundColor(bookmarkManager.isBookmarked(topic: topic) ? .red : .blue)
+                .font(.title2)
+        })
     }
 }

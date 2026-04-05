@@ -21,16 +21,18 @@ func application(_ application: UIApplication,
 struct SciTechHubApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var authViewModel = AuthViewModel()
+    @StateObject var bookmarkManager = BookmarkManager() // Initialize Bookmark Manager globally
         
-
-        var body: some Scene {
-            WindowGroup {
-                if authViewModel.isSignedIn {
-                    HomeView()
-                } else {
-                    AuthView()
-                        .environmentObject(authViewModel)
-                }
+    var body: some Scene {
+        WindowGroup {
+            if authViewModel.isSignedIn {
+                HomeView()
+                    .environmentObject(bookmarkManager) // Inject down for all Home views
+                    .environmentObject(authViewModel)   // Provide auth access correctly
+            } else {
+                AuthView()
+                    .environmentObject(authViewModel)
             }
         }
     }
+}
