@@ -142,8 +142,8 @@ struct TopicDetailView: View {
         .navigationBarItems(trailing: Button(action: {
             bookmarkManager.toggleBookmark(topic: topic)
         }) {
-            Image(systemName: bookmarkManager.isBookmarked(topic: topic) ? "heart.fill" : "heart")
-                .foregroundColor(bookmarkManager.isBookmarked(topic: topic) ? .red : .blue)
+            Image(systemName: bookmarkManager.isBookmarked(topic: topic) ? "bookmark.fill" : "bookmark")
+                .foregroundColor(bookmarkManager.isBookmarked(topic: topic) ? .blue : .blue)
                 .font(.title2)
                 .padding(8)
                 .background(Circle().fill(Color.gray.opacity(0.1))) // Soft circular background for button

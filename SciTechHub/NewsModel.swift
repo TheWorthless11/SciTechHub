@@ -14,6 +14,7 @@ struct Article: Codable, Identifiable {
     let title: String
     let description: String? // Made optional as NewsAPI sometimes returns null for missing descriptions
     let urlToImage: String?
+    let url: String? // The URL to the full article
     
     // We use CodingKeys to tell Swift to ignore the "id" property when decoding the JSON,
     // and only look for the fields that actually come from NewsAPI.
@@ -21,5 +22,6 @@ struct Article: Codable, Identifiable {
         case title
         case description
         case urlToImage
+        case url
     }
 }

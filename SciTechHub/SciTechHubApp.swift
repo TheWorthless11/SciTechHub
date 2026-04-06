@@ -3,7 +3,7 @@
 //  SciTechHub
 //
 //  Created by Sayaka Alam on 5/4/26.
-//
+// Roll: 2107081 & 2107082
 
 import SwiftUI
 import FirebaseCore
@@ -22,17 +22,21 @@ struct SciTechHubApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var authViewModel = AuthViewModel()
     @StateObject var bookmarkManager = BookmarkManager() // Initialize Bookmark Manager globally
-        
+    @AppStorage("isDarkMode") private var isDarkMode = false
+    
     var body: some Scene {
         WindowGroup {
-            if authViewModel.isSignedIn {
-                HomeView()
-                    .environmentObject(bookmarkManager) // Inject down for all Home views
-                    .environmentObject(authViewModel)   // Provide auth access correctly
-            } else {
-                AuthView()
-                    .environmentObject(authViewModel)
+            Group {
+                if authViewModel.isSignedIn {
+                    MainTabView()
+                        .environmentObject(bookmarkManager) // Inject down for all tabs
+                        .environmentObject(authViewModel)   // Provide auth access correctly
+                } else {
+                    LoginView()
+                        .environmentObject(authViewModel)
+                }
             }
+            .preferredColorScheme(isDarkMode ? .dark : .light)
         }
     }
 }

@@ -70,94 +70,25 @@ struct HomeView: View {
                         }
                     }
                     .padding(.horizontal)
-                    
-                    // MARK: - My Stuff Section
-                    Text("My Stuff")
-                        .font(.title2)
-                        .fontWeight(.bold)
-                        .padding(.horizontal)
-                        .padding(.top, 10)
-                    
-                    VStack(spacing: 16) {
-                        // Navigate to News View
-                        NavigationLink(destination: NewsView()) {
-                            HStack(spacing: 15) {
-                                Text("📰")
-                                    .font(.title2)
-                                
-                                Text("Trending News")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                            .padding()
-                            .background(Color.orange.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                        
-                        NavigationLink(destination: BookmarkView()) {
-                            HStack(spacing: 15) {
-                                Text("❤️")
-                                    .font(.title2)
-                                
-                                Text("Bookmarks")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                            .padding()
-                            .background(Color.red.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                        
-                        NavigationLink(destination: NotesView()) {
-                            HStack(spacing: 15) {
-                                Text("📝")
-                                    .font(.title2)
-                                
-                                Text("My Notes")
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                
-                                Spacer()
-                                
-                                Image(systemName: "chevron.right")
-                                    .foregroundColor(.gray)
-                            }
-                            .padding()
-                            .background(Color.green.opacity(0.1))
-                            .cornerRadius(12)
-                        }
-                    }
-                    .padding(.horizontal)
                 }
                 .padding(.vertical)
             }
-            .navigationTitle("SciTech Hub")
-            // Logout button
-            .navigationBarItems(trailing: Button(action: {
-                authViewModel.signOut()
-            }) {
-                Text("Logout")
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.red)
-                    .cornerRadius(8)
-            })
+            .navigationTitle("Home")
+            // Profile Icon
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    NavigationLink(destination: ProfileView().environmentObject(authViewModel)) {
+                        Image(systemName: "person.circle")
+                            .font(.title2)
+                    }
+                }
+            }
             // Reload bookmarks based on current user
             .onAppear {
                 bookmarkManager.loadBookmarks()
             }
         }
+        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 
