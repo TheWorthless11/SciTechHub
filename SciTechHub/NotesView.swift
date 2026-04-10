@@ -1,5 +1,6 @@
 import SwiftUI
 import FirebaseFirestore
+import FirebaseAuth
 
 // MARK: - 1. Note Model
 struct Note: Identifiable {
@@ -11,16 +12,46 @@ struct Note: Identifiable {
 // MARK: - 2. Firestore Manager (ViewModel)
 class FirestoreManager: ObservableObject {
     @Published var notes: [Note] = []
+    @Published var errorMessage: String?
     
     // Reference to our Firestore database
     private var db = Firestore.firestore()
+    private var notesListener: ListenerRegistration?
+    
+    deinit {
+        notesListener?.remove()
+    }
+    
+    private var userNotesCollection: CollectionReference? {
+        guard let uid = Auth.auth().currentUser?.uid else { return nil }
+        return db.collection("users").document(uid).collection("notes")
+    }
+
+    private func friendlyErrorMessage(for error: Error) -> String {
+        let nsError = error as NSError
+        if nsError.domain == FirestoreErrorDomain,
+           nsError.code == FirestoreErrorCode.permissionDenied.rawValue {
+            return "Permission denied for notes. Update Firestore Rules to allow users to access only their own notes."
+        }
+        return error.localizedDescription
+    }
     
     // Fetch notes with a real-time listener
     func fetchNotes() {
-        db.collection("notes").addSnapshotListener { (querySnapshot, error) in
+        guard let uid = Auth.auth().currentUser?.uid, let collection = userNotesCollection else {
+            clearNotes()
+            errorMessage = "Login required to load notes."
+            return
+        }
+        
+        notesListener?.remove()
+        notesListener = collection.whereField("ownerId", isEqualTo: uid).addSnapshotListener { (querySnapshot, error) in
             // Basic error handling
             if let error = error {
                 print("Error getting notes: \(error.localizedDescription)")
+                DispatchQueue.main.async {
+                    self.errorMessage = self.friendlyErrorMessage(for: error)
+                }
                 return
             }
             
@@ -28,90 +59,176 @@ class FirestoreManager: ObservableObject {
             guard let documents = querySnapshot?.documents else { return }
             
             // Map the Firestore documents into our Swift 'Note' array
-            self.notes = documents.map { queryDocumentSnapshot -> Note in
+            let loadedNotes = documents.map { queryDocumentSnapshot -> Note in
                 let data = queryDocumentSnapshot.data()
                 let title = data["title"] as? String ?? ""
                 let content = data["content"] as? String ?? ""
                 
                 return Note(id: queryDocumentSnapshot.documentID, title: title, content: content)
             }
+            
+            DispatchQueue.main.async {
+                self.notes = loadedNotes
+                self.errorMessage = nil
+            }
         }
+    }
+    
+    func clearNotes() {
+        notesListener?.remove()
+        notesListener = nil
+        notes = []
+        errorMessage = nil
     }
     
     // Add a new note to Firestore
     func addNote(title: String, content: String) {
-        db.collection("notes").addDocument(data: [
+        guard let uid = Auth.auth().currentUser?.uid, let collection = userNotesCollection else {
+            errorMessage = "Login required to create notes."
+            return
+        }
+        
+        collection.addDocument(data: [
             "title": title,
-            "content": content
-        ])
+            "content": content,
+            "ownerId": uid,
+            "createdAt": FieldValue.serverTimestamp(),
+            "updatedAt": FieldValue.serverTimestamp()
+        ]) { error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.errorMessage = self.friendlyErrorMessage(for: error)
+                }
+            }
+        }
     }
     
     // Delete a note from Firestore
     func deleteNote(note: Note) {
-        db.collection("notes").document(note.id).delete()
+        guard let collection = userNotesCollection else {
+            errorMessage = "Login required to delete notes."
+            return
+        }
+        
+        collection.document(note.id).delete { error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.errorMessage = self.friendlyErrorMessage(for: error)
+                }
+            }
+        }
     }
     
     // Update an existing note in Firestore
     func updateNote(note: Note, newTitle: String, newContent: String) {
-        db.collection("notes").document(note.id).updateData([
+        guard let collection = userNotesCollection else {
+            errorMessage = "Login required to update notes."
+            return
+        }
+        
+        collection.document(note.id).updateData([
             "title": newTitle,
-            "content": newContent
-        ])
+            "content": newContent,
+            "updatedAt": FieldValue.serverTimestamp()
+        ]) { error in
+            if let error = error {
+                DispatchQueue.main.async {
+                    self.errorMessage = self.friendlyErrorMessage(for: error)
+                }
+            }
+        }
     }
 }
 
 // MARK: - 3. Target Notes View
 struct NotesView: View {
     @StateObject private var firestoreManager = FirestoreManager()
+    @EnvironmentObject var authViewModel: AuthViewModel
     @State private var showAddNote = false
+    @State private var showLoginSheet = false
     
     var body: some View {
-        List {
-            ForEach(firestoreManager.notes) { note in
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(note.title)
-                        .font(.headline)
-                    Text(note.content)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .lineLimit(2)
-                    
-                    HStack(spacing: 20) {
-                        // Edit Button (Navigates to Edit Screen)
-                        NavigationLink(destination: EditNoteView(firestoreManager: firestoreManager, note: note)) {
-                            Text("Edit")
-                                .font(.callout)
-                                .foregroundColor(.blue)
-                        }
-                        .buttonStyle(BorderlessButtonStyle())
-                        
-                        // Delete Button
-                        Button(action: {
-                            firestoreManager.deleteNote(note: note)
-                        }) {
-                            Text("Delete")
-                                .font(.callout)
-                                .foregroundColor(.red)
-                        }
-                        .buttonStyle(BorderlessButtonStyle())
-                    }
-                    .padding(.top, 4)
+        Group {
+            if !authViewModel.isLoggedIn {
+                LoginRequiredView(
+                    message: "My Notes is available for logged-in users only."
+                ) {
+                    showLoginSheet = true
                 }
-                .padding(.vertical, 4)
+            } else {
+                List {
+                    if let error = firestoreManager.errorMessage {
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundColor(.red)
+                    }
+
+                    ForEach(firestoreManager.notes) { note in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(note.title)
+                                .font(.headline)
+                            Text(note.content)
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                                .lineLimit(2)
+                            
+                            HStack(spacing: 20) {
+                                // Edit Button (Navigates to Edit Screen)
+                                NavigationLink(destination: EditNoteView(firestoreManager: firestoreManager, note: note)) {
+                                    Text("Edit")
+                                        .font(.callout)
+                                        .foregroundColor(.blue)
+                                }
+                                .buttonStyle(BorderlessButtonStyle())
+                                
+                                // Delete Button
+                                Button(action: {
+                                    firestoreManager.deleteNote(note: note)
+                                }) {
+                                    Text("Delete")
+                                        .font(.callout)
+                                        .foregroundColor(.red)
+                                }
+                                .buttonStyle(BorderlessButtonStyle())
+                            }
+                            .padding(.top, 4)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                }
             }
         }
         .navigationTitle("My Notes")
-        .navigationBarItems(trailing: Button(action: {
-            showAddNote = true // Opens the add screen
-        }) {
-            Image(systemName: "plus")
-        })
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                if authViewModel.isLoggedIn {
+                    Button(action: {
+                        showAddNote = true // Opens the add screen
+                    }) {
+                        Image(systemName: "plus")
+                    }
+                }
+            }
+        }
         .sheet(isPresented: $showAddNote) {
             AddNoteView(firestoreManager: firestoreManager)
         }
+        .sheet(isPresented: $showLoginSheet) {
+            LoginView(showGuestDismiss: true)
+                .environmentObject(authViewModel)
+        }
         // Fetch our notes as soon as the screen opens
         .onAppear {
-            firestoreManager.fetchNotes()
+            if authViewModel.isLoggedIn {
+                firestoreManager.fetchNotes()
+            }
+        }
+        .onChange(of: authViewModel.isLoggedIn) { isLoggedIn in
+            if isLoggedIn {
+                firestoreManager.fetchNotes()
+            } else {
+                firestoreManager.clearNotes()
+            }
         }
     }
 }
@@ -203,6 +320,7 @@ struct NotesView_Previews: PreviewProvider {
     static var previews: some View {
         NavigationView {
             NotesView()
+                .environmentObject(AuthViewModel())
         }
     }
 }

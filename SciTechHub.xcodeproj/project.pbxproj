@@ -22,6 +22,7 @@
 		0B8305642F83CF5900E57C11 /* FAQView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8305632F83CF5900E57C11 /* FAQView.swift */; };
 		0B8305662F83CF6500E57C11 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8305652F83CF6500E57C11 /* ProfileView.swift */; };
 		0B8305682F83CF6F00E57C11 /* ProfileViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B8305672F83CF6F00E57C11 /* ProfileViewModel.swift */; };
+		0B9C0D2A2F90000100ABCDE1 /* RecommendedView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B9C0D2B2F90000100ABCDE1 /* RecommendedView.swift */; };
 		0BA3A7F32F82B7C00093599C /* BookmarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA3A7F22F82B7C00093599C /* BookmarkManager.swift */; };
 		0BA3A7F52F82B7D80093599C /* NewsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA3A7F42F82B7D80093599C /* NewsModel.swift */; };
 		0BA3A7F72F82B7E00093599C /* BookmarkView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BA3A7F62F82B7E00093599C /* BookmarkView.swift */; };
@@ -39,6 +40,12 @@
 		0BCE431B2F81F24A0000A45B /* FirebaseAnalytics in Frameworks */ = {isa = PBXBuildFile; productRef = 0BCE431A2F81F24A0000A45B /* FirebaseAnalytics */; };
 		0BCE431D2F81F24A0000A45B /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = 0BCE431C2F81F24A0000A45B /* FirebaseAuth */; };
 		0BCE431F2F81F24A0000A45B /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = 0BCE431E2F81F24A0000A45B /* FirebaseFirestore */; };
+		0BD8E2AA2F91000B00BEEF11 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = 0BD8E2AB2F91000B00BEEF11 /* FirebaseStorage */; };
+		0BEA1F0A2FA1000100D00D11 /* ArticleSummaryViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BEA1F0B2FA1000100D00D11 /* ArticleSummaryViewModel.swift */; };
+		0BF0A1A12FB2000100C0AA01 /* CommentViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0BF0A1A22FB2000100C0AA01 /* CommentViewModel.swift */; };
+		0C1D2E3F4A5B6C7D8E9F0011 /* ScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C1D2E3F4A5B6C7D8E9F0012 /* ScanView.swift */; };
+		0C2D3E4F5A6B7C8D9E0F1121 /* LiveVideoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C2D3E4F5A6B7C8D9E0F1122 /* LiveVideoView.swift */; };
+		0C3D4E5F6A7B8C9D0E1F2231 /* DirectMessagingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0C3D4E5F6A7B8C9D0E1F2232 /* DirectMessagingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -70,6 +77,7 @@
 		0B8305632F83CF5900E57C11 /* FAQView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = FAQView.swift; sourceTree = "<group>"; };
 		0B8305652F83CF6500E57C11 /* ProfileView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		0B8305672F83CF6F00E57C11 /* ProfileViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ProfileViewModel.swift; sourceTree = "<group>"; };
+		0B9C0D2B2F90000100ABCDE1 /* RecommendedView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecommendedView.swift; sourceTree = "<group>"; };
 		0BA3A7F22F82B7C00093599C /* BookmarkManager.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BookmarkManager.swift; sourceTree = "<group>"; };
 		0BA3A7F42F82B7D80093599C /* NewsModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = NewsModel.swift; sourceTree = "<group>"; };
 		0BA3A7F62F82B7E00093599C /* BookmarkView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = BookmarkView.swift; sourceTree = "<group>"; };
@@ -91,6 +99,13 @@
 		0BCE43072F81ED850000A45B /* SciTechHubUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SciTechHubUITests.swift; sourceTree = "<group>"; };
 		0BCE43092F81ED850000A45B /* SciTechHubUITestsLaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SciTechHubUITestsLaunchTests.swift; sourceTree = "<group>"; };
 		0BCE43162F81EFB20000A45B /* GoogleService-Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		0BEA1F0B2FA1000100D00D11 /* ArticleSummaryViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArticleSummaryViewModel.swift; sourceTree = "<group>"; };
+		0BF0A1A22FB2000100C0AA01 /* CommentViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CommentViewModel.swift; sourceTree = "<group>"; };
+		0C1D2E3F4A5B6C7D8E9F0012 /* ScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanView.swift; sourceTree = "<group>"; };
+		0C2D3E4F5A6B7C8D9E0F1122 /* LiveVideoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveVideoView.swift; sourceTree = "<group>"; };
+		0C3D4E5F6A7B8C9D0E1F2232 /* DirectMessagingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectMessagingView.swift; sourceTree = "<group>"; };
+		0D4E5F6A7B8C9D0E1F223344 /* AppSecrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Config/AppSecrets.xcconfig"; sourceTree = "<group>"; };
+		0D4E5F6A7B8C9D0E1F223345 /* LocalSecrets.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "Config/LocalSecrets.xcconfig.example"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -101,6 +116,7 @@
 				0BCE431B2F81F24A0000A45B /* FirebaseAnalytics in Frameworks */,
 				0BCE431D2F81F24A0000A45B /* FirebaseAuth in Frameworks */,
 				0BCE431F2F81F24A0000A45B /* FirebaseFirestore in Frameworks */,
+				0BD8E2AA2F91000B00BEEF11 /* FirebaseStorage in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -169,6 +185,14 @@
 		0BCE42EB2F81ED7E0000A45B /* SciTechHub */ = {
 			isa = PBXGroup;
 			children = (
+				0D4E5F6A7B8C9D0E1F223344 /* AppSecrets.xcconfig */,
+				0D4E5F6A7B8C9D0E1F223345 /* LocalSecrets.xcconfig.example */,
+				0C3D4E5F6A7B8C9D0E1F2232 /* DirectMessagingView.swift */,
+				0C2D3E4F5A6B7C8D9E0F1122 /* LiveVideoView.swift */,
+				0C1D2E3F4A5B6C7D8E9F0012 /* ScanView.swift */,
+				0BF0A1A22FB2000100C0AA01 /* CommentViewModel.swift */,
+				0BEA1F0B2FA1000100D00D11 /* ArticleSummaryViewModel.swift */,
+				0B9C0D2B2F90000100ABCDE1 /* RecommendedView.swift */,
 				0B7DF5312F83D769002F7BD5 /* TrendingView.swift */,
 				0B7DF52F2F83D75E002F7BD5 /* MainTabView.swift */,
 				0B7DF52D2F83D712002F7BD5 /* LoginView.swift */,
@@ -243,6 +267,7 @@
 				0BCE431A2F81F24A0000A45B /* FirebaseAnalytics */,
 				0BCE431C2F81F24A0000A45B /* FirebaseAuth */,
 				0BCE431E2F81F24A0000A45B /* FirebaseFirestore */,
+				0BD8E2AB2F91000B00BEEF11 /* FirebaseStorage */,
 			);
 			productName = SciTechHub;
 			productReference = 0BCE42E92F81ED7E0000A45B /* SciTechHub.app */;
@@ -365,6 +390,12 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0C3D4E5F6A7B8C9D0E1F2231 /* DirectMessagingView.swift in Sources */,
+				0C2D3E4F5A6B7C8D9E0F1121 /* LiveVideoView.swift in Sources */,
+				0C1D2E3F4A5B6C7D8E9F0011 /* ScanView.swift in Sources */,
+				0BF0A1A12FB2000100C0AA01 /* CommentViewModel.swift in Sources */,
+				0BEA1F0A2FA1000100D00D11 /* ArticleSummaryViewModel.swift in Sources */,
+				0B9C0D2A2F90000100ABCDE1 /* RecommendedView.swift in Sources */,
 				0B8305622F83CF5200E57C11 /* EditProfileView.swift in Sources */,
 				0B4EA2F02F8209A900822414 /* AuthViewModel.swift in Sources */,
 				0BCE42EF2F81ED7E0000A45B /* ContentView.swift in Sources */,
@@ -537,20 +568,24 @@
 		};
 		0BCE430E2F81ED850000A45B /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0D4E5F6A7B8C9D0E1F223344 /* AppSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SciTechHub/Preview Content\"";
-				DEVELOPMENT_TEAM = GTX5U2JS8Q;
+				DEVELOPMENT_TEAM = 9M6UHLWL27;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Allow camera access to scan text for notes and smart processing.";
+				INFOPLIST_KEY_OPENAI_API_KEY = "$(OPENAI_API_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_YOUTUBE_DATA_API_KEY = "$(YOUTUBE_DATA_API_KEY)";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -567,20 +602,24 @@
 		};
 		0BCE430F2F81ED850000A45B /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 0D4E5F6A7B8C9D0E1F223344 /* AppSecrets.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"SciTechHub/Preview Content\"";
-				DEVELOPMENT_TEAM = GTX5U2JS8Q;
+				DEVELOPMENT_TEAM = 9M6UHLWL27;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSCameraUsageDescription = "Allow camera access to scan text for notes and smart processing.";
+				INFOPLIST_KEY_OPENAI_API_KEY = "$(OPENAI_API_KEY)";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_YOUTUBE_DATA_API_KEY = "$(YOUTUBE_DATA_API_KEY)";
 				IPHONEOS_DEPLOYMENT_TARGET = 15.4;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -713,8 +752,8 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
 			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 9.0.0;
+				kind = exactVersion;
+				version = 10.15.0;
 			};
 		};
 /* End XCRemoteSwiftPackageReference section */
@@ -734,6 +773,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0BCE43192F81F24A0000A45B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseFirestore;
+		};
+		0BD8E2AB2F91000B00BEEF11 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0BCE43192F81F24A0000A45B /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -3,10 +3,18 @@ import SwiftUI
 struct BookmarkView: View {
     // Access the shared bookmarks from the environment
     @EnvironmentObject var bookmarkManager: BookmarkManager
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var showLoginSheet = false
     
     var body: some View {
         Group {
-            if bookmarkManager.bookmarks.isEmpty && bookmarkManager.bookmarkedArticles.isEmpty {
+            if !authViewModel.isLoggedIn {
+                LoginRequiredView(
+                    message: "Saved topics and bookmarked articles are available for logged-in users."
+                ) {
+                    showLoginSheet = true
+                }
+            } else if bookmarkManager.bookmarks.isEmpty && bookmarkManager.bookmarkedArticles.isEmpty {
                 // Empty state view
                 VStack(spacing: 20) {
                     Image(systemName: "bookmark.slash")
@@ -98,6 +106,56 @@ struct BookmarkView: View {
             }
         }
         .navigationTitle("Bookmarks")
+        .sheet(isPresented: $showLoginSheet) {
+            LoginView(showGuestDismiss: true)
+                .environmentObject(authViewModel)
+        }
+    }
+}
+
+struct LoginRequiredView: View {
+    let title: String
+    let message: String
+    let onLoginTap: () -> Void
+
+    init(
+        title: String = "Login to access this feature",
+        message: String = "Please sign in to unlock this section.",
+        onLoginTap: @escaping () -> Void
+    ) {
+        self.title = title
+        self.message = message
+        self.onLoginTap = onLoginTap
+    }
+
+    var body: some View {
+        VStack(spacing: 14) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 42))
+                .foregroundColor(.orange)
+
+            Text(title)
+                .font(.headline)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Button(action: onLoginTap) {
+                Text("Login")
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 10)
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+            }
+            .padding(.top, 4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
     }
 }
 
@@ -106,6 +164,7 @@ struct BookmarkView_Previews: PreviewProvider {
         NavigationView {
             BookmarkView()
                 .environmentObject(BookmarkManager())
+                .environmentObject(AuthViewModel())
         }
     }
 }

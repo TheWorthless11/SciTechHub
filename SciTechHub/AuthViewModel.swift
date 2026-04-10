@@ -11,8 +11,33 @@ import FirebaseAuth
 class AuthViewModel: ObservableObject {
     // Published properties to update the UI
     @Published var user: User?
-    @Published var isSignedIn: Bool = false
+    @Published var isLoggedIn: Bool = false
     @Published var errorMessage: String = ""
+    
+    private var authStateHandle: AuthStateDidChangeListenerHandle?
+    
+    var isSignedIn: Bool {
+        isLoggedIn
+    }
+    
+    init() {
+        observeAuthState()
+    }
+    
+    deinit {
+        if let authStateHandle {
+            Auth.auth().removeStateDidChangeListener(authStateHandle)
+        }
+    }
+    
+    private func observeAuthState() {
+        authStateHandle = Auth.auth().addStateDidChangeListener { [weak self] _, user in
+            DispatchQueue.main.async {
+                self?.user = user
+                self?.isLoggedIn = (user != nil)
+            }
+        }
+    }
     
     // MARK: - Sign Up
     func signUp(email: String, password: String) {
@@ -23,9 +48,8 @@ class AuthViewModel: ObservableObject {
                     return
                 }
                 
-                // On success, store the user and update login state
+                // Auth state listener updates user/login state.
                 self?.user = result?.user
-                self?.isSignedIn = true
                 self?.errorMessage = "" // Clear any previous errors
             }
         }
@@ -40,9 +64,8 @@ class AuthViewModel: ObservableObject {
                     return
                 }
                 
-                // On success, store the user and update login state
+                // Auth state listener updates user/login state.
                 self?.user = result?.user
-                self?.isSignedIn = true
                 self?.errorMessage = "" // Clear any previous errors
             }
         }
@@ -53,9 +76,8 @@ class AuthViewModel: ObservableObject {
         do {
             try Auth.auth().signOut()
             DispatchQueue.main.async {
-                // Clear state on successful sign out
+                // Auth state listener updates user/login state.
                 self.user = nil
-                self.isSignedIn = false
                 self.errorMessage = "" // Clear any previous errors
             }
         } catch let signOutError {

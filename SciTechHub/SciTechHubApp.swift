@@ -22,20 +22,15 @@ struct SciTechHubApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var delegate
     @StateObject var authViewModel = AuthViewModel()
     @StateObject var bookmarkManager = BookmarkManager() // Initialize Bookmark Manager globally
+    @StateObject var userActivityViewModel = UserActivityViewModel()
     @AppStorage("isDarkMode") private var isDarkMode = false
     
     var body: some Scene {
         WindowGroup {
-            Group {
-                if authViewModel.isSignedIn {
-                    MainTabView()
-                        .environmentObject(bookmarkManager) // Inject down for all tabs
-                        .environmentObject(authViewModel)   // Provide auth access correctly
-                } else {
-                    LoginView()
-                        .environmentObject(authViewModel)
-                }
-            }
+            MainTabView()
+                .environmentObject(bookmarkManager) // Inject down for all tabs
+                .environmentObject(authViewModel)   // Provide auth access globally
+                .environmentObject(userActivityViewModel)
             .preferredColorScheme(isDarkMode ? .dark : .light)
         }
     }

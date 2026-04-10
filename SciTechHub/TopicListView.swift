@@ -93,6 +93,9 @@ struct TopicDetailView: View {
     
     // Connect to our global BookmarkManager
     @EnvironmentObject var bookmarkManager: BookmarkManager
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var showLoginPrompt = false
+    @State private var showLoginSheet = false
     
     var body: some View {
         ScrollView {
@@ -140,13 +143,40 @@ struct TopicDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         // Add the Bookmark button to the top right of the screen
         .navigationBarItems(trailing: Button(action: {
-            bookmarkManager.toggleBookmark(topic: topic)
+            if authViewModel.isLoggedIn {
+                bookmarkManager.toggleBookmark(topic: topic)
+            } else {
+                showLoginPrompt = true
+            }
         }) {
-            Image(systemName: bookmarkManager.isBookmarked(topic: topic) ? "bookmark.fill" : "bookmark")
-                .foregroundColor(bookmarkManager.isBookmarked(topic: topic) ? .blue : .blue)
+            Image(systemName: bookmarkIconName)
+                .foregroundColor(bookmarkIconColor)
                 .font(.title2)
                 .padding(8)
                 .background(Circle().fill(Color.gray.opacity(0.1))) // Soft circular background for button
         })
+        .alert("Login to access this feature", isPresented: $showLoginPrompt) {
+            Button("Not Now", role: .cancel) { }
+            Button("Login") {
+                showLoginSheet = true
+            }
+        } message: {
+            Text("Saving topic bookmarks is available for logged-in users.")
+        }
+        .sheet(isPresented: $showLoginSheet) {
+            LoginView(showGuestDismiss: true)
+                .environmentObject(authViewModel)
+        }
+    }
+
+    private var bookmarkIconName: String {
+        if !authViewModel.isLoggedIn {
+            return "lock.fill"
+        }
+        return bookmarkManager.isBookmarked(topic: topic) ? "bookmark.fill" : "bookmark"
+    }
+
+    private var bookmarkIconColor: Color {
+        authViewModel.isLoggedIn ? .blue : .orange
     }
 }

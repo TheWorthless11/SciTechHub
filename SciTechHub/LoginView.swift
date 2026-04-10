@@ -2,6 +2,9 @@ import SwiftUI
 
 struct LoginView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.dismiss) private var dismiss
+    
+    let showGuestDismiss: Bool
     
     // MARK: - State Properties
     @State private var email = ""
@@ -10,10 +13,26 @@ struct LoginView: View {
     @State private var isLoading = false
     @State private var isSignUp = false // Toggle between Sign In and Sign Up
     
+    init(showGuestDismiss: Bool = false) {
+        self.showGuestDismiss = showGuestDismiss
+    }
+    
     // MARK: - Body
     var body: some View {
         NavigationView {
             VStack(spacing: 30) {
+                if showGuestDismiss {
+                    HStack {
+                        Spacer()
+                        Button("Continue as Guest") {
+                            dismiss()
+                        }
+                        .font(.footnote)
+                        .foregroundColor(.blue)
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 8)
+                }
                 
                 // MARK: - Header
                 VStack(spacing: 8) {
@@ -147,6 +166,11 @@ struct LoginView: View {
                 .padding(.bottom, 20)
             }
             .navigationBarHidden(true)
+            .onChange(of: authViewModel.isLoggedIn) { isLoggedIn in
+                if isLoggedIn && showGuestDismiss {
+                    dismiss()
+                }
+            }
         }
     }
     

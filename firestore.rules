@@ -1,0 +1,404 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isFriendWith(userId) {
+      return isSignedIn()
+             && (
+               (
+                 exists(/databases/$(database)/documents/friends/$(userId))
+                 && get(/databases/$(database)/documents/friends/$(userId)).data.friendIds.hasAny([request.auth.uid])
+               )
+               ||
+               (
+                 exists(/databases/$(database)/documents/friends/$(request.auth.uid))
+                 && get(/databases/$(database)/documents/friends/$(request.auth.uid)).data.friendIds.hasAny([userId])
+               )
+             );
+    }
+
+    // Default behavior: profiles are public unless explicitly set to false.
+    function isTargetProfilePublic(userId) {
+      return !exists(/databases/$(database)/documents/users/$(userId))
+             || get(/databases/$(database)/documents/users/$(userId)).data.isProfilePublic != false;
+    }
+
+    function canReadUserProfile(userId) {
+      return isOwner(userId) || isTargetProfilePublic(userId) || isFriendWith(userId);
+    }
+
+    function canMessageUser(receiverId) {
+      return isSignedIn()
+             && (
+               // Default behavior: everyone can message unless receiver sets "friends".
+               !exists(/databases/$(database)/documents/users/$(receiverId))
+               || get(/databases/$(database)/documents/users/$(receiverId)).data.messagePermission == "everyone"
+               || (
+                 get(/databases/$(database)/documents/users/$(receiverId)).data.messagePermission == "friends"
+                 && isFriendWith(receiverId)
+               )
+             );
+    }
+
+    // User profile document (optional)
+    match /users/{userId} {
+      // Keep authenticated read for friend search; UI enforces private profile presentation.
+      allow read: if isSignedIn();
+
+      allow write: if isOwner(userId);
+
+      // Notes: users/{userId}/notes/{noteId}
+      match /notes/{noteId} {
+        allow create: if isOwner(userId)
+                      && request.resource.data.ownerId == request.auth.uid;
+
+        allow read, update, delete: if isOwner(userId)
+                                    && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Article notes: users/{userId}/articleNotes/{articleNoteId}
+      match /articleNotes/{articleNoteId} {
+        allow create: if isOwner(userId)
+                      && request.resource.data.ownerId == request.auth.uid
+                      && request.resource.data.articleRefId is string
+                      && request.resource.data.articleRefId.size() > 0
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() <= 10000;
+
+        allow read, update, delete: if isOwner(userId)
+                                    && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Scan notes: users/{userId}/scanNotes/{scanNoteId}
+      match /scanNotes/{scanNoteId} {
+        allow create: if isOwner(userId)
+                      && request.resource.data.ownerId == request.auth.uid
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() <= 20000
+                      && request.resource.data.keywords is list;
+
+        allow read, update, delete: if isOwner(userId)
+                                    && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Bookmarks: users/{userId}/bookmarks/{bookmarkId}
+      match /bookmarks/{bookmarkId} {
+        allow create: if isOwner(userId)
+                      && request.resource.data.ownerId == request.auth.uid;
+
+        allow read, update, delete: if isOwner(userId)
+                                    && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Liked articles: users/{userId}/likedArticles/{articleId}
+      match /likedArticles/{articleId} {
+        allow create: if isOwner(userId)
+                      && request.resource.data.ownerId == request.auth.uid;
+
+        // Activity visibility follows profile privacy.
+        allow read: if isSignedIn() && canReadUserProfile(userId);
+
+        allow update, delete: if isOwner(userId)
+                              && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Reading history: users/{userId}/readArticles/{articleId}
+      match /readArticles/{articleId} {
+        allow create: if isOwner(userId)
+                      && request.resource.data.ownerId == request.auth.uid;
+
+        // Activity visibility follows profile privacy.
+        allow read: if isSignedIn() && canReadUserProfile(userId);
+
+        allow update, delete: if isOwner(userId)
+                              && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Legacy likes collection kept for backward compatibility.
+      match /likes/{likeId} {
+        allow create: if isOwner(userId)
+                      && request.resource.data.ownerId == request.auth.uid;
+
+        allow read: if isSignedIn() && canReadUserProfile(userId);
+
+        allow update, delete: if isOwner(userId)
+                              && resource.data.ownerId == request.auth.uid;
+      }
+
+      // Social graph stored as per-user friend documents.
+      match /friends/{friendId} {
+        // Needed for mutual-connection recommendations and social discovery.
+        allow read: if isSignedIn() && canReadUserProfile(userId);
+
+        // Owner can always manage. Connected peer can maintain mirrored friend doc.
+        allow create, update, delete: if isSignedIn()
+                                      && (isOwner(userId)
+                                          || request.auth.uid == friendId);
+      }
+
+      // Per-user friend request mirror for fast inbox/sent views.
+      match /friendRequests/{peerId} {
+        allow read: if isOwner(userId);
+
+        // Sender can write both "sent" and receiver "inbox" mirror docs.
+        allow create: if isSignedIn()
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.resource.data.status == "pending"
+                      && (
+                        request.resource.data.senderId == userId
+                        || request.resource.data.receiverId == userId
+                      );
+
+        // Either participant can update mirrored status.
+        allow update: if isSignedIn()
+                      && (
+                        isOwner(userId)
+                        || request.auth.uid == resource.data.senderId
+                        || request.auth.uid == resource.data.receiverId
+                      );
+
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    match /friendRequests/{requestId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.status == "pending";
+
+      allow read: if isSignedIn()
+                  && (
+                    // Allow get() on non-existent docs for duplicate-request prechecks.
+                    resource == null
+                    || resource.data.senderId == request.auth.uid
+                    || resource.data.receiverId == request.auth.uid
+                  );
+
+      allow update, delete: if isSignedIn()
+                            && (resource.data.senderId == request.auth.uid
+                                || resource.data.receiverId == request.auth.uid);
+    }
+
+    match /friends/{userId} {
+      allow read: if isOwner(userId);
+
+      allow write: if isSignedIn()
+                   && (
+                     isOwner(userId)
+                     || (
+                       exists(/databases/$(database)/documents/friendRequests/$(request.auth.uid + "_" + userId))
+                       && get(/databases/$(database)/documents/friendRequests/$(request.auth.uid + "_" + userId)).data.status == "accepted"
+                     )
+                     || (
+                       exists(/databases/$(database)/documents/friendRequests/$(userId + "_" + request.auth.uid))
+                       && get(/databases/$(database)/documents/friendRequests/$(userId + "_" + request.auth.uid)).data.status == "accepted"
+                     )
+                   );
+    }
+
+    // Article discussions (Reddit-style comment threads).
+    match /articles/{articleId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /comments/{commentId} {
+        // Guests can read discussions.
+        allow read: if true;
+
+        // Logged-in users can create comments/replies.
+        allow create: if isSignedIn()
+                      && request.resource.data.articleId == articleId
+                      && request.resource.data.authorId == request.auth.uid
+                      && request.resource.data.authorName is string
+                      && request.resource.data.authorPhotoURL is string
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() <= 2000
+                      && request.resource.data.createdAt == request.time
+                      && request.resource.data.likedBy is list
+                      && request.resource.data.likedBy.size() == 0
+                      && (
+                        !request.resource.data.keys().hasAny(["parentId"])
+                        || request.resource.data.parentId is string
+                      );
+
+        // Only allow authenticated users to toggle their own upvote state.
+        allow update: if isSignedIn()
+                      && request.resource.data.diff(resource.data).affectedKeys().hasOnly(["likedBy"])
+                      && request.resource.data.likedBy is list
+                      && (
+                        (
+                          !resource.data.likedBy.hasAny([request.auth.uid])
+                          && request.resource.data.likedBy.hasAny([request.auth.uid])
+                          && request.resource.data.likedBy.size() == resource.data.likedBy.size() + 1
+                        )
+                        ||
+                        (
+                          resource.data.likedBy.hasAny([request.auth.uid])
+                          && !request.resource.data.likedBy.hasAny([request.auth.uid])
+                          && request.resource.data.likedBy.size() + 1 == resource.data.likedBy.size()
+                        )
+                      );
+
+        // Comment author can delete their own comment.
+        allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+      }
+    }
+
+    // Community system: communities -> posts -> comments.
+    match /communities/{communityId} {
+      allow read: if true;
+      allow write: if false;
+
+      match /posts/{postId} {
+        allow read: if true;
+
+        allow create: if isSignedIn()
+                      && request.resource.data.communityId == communityId
+                      && request.resource.data.authorId == request.auth.uid
+                      && request.resource.data.authorName is string
+                      && request.resource.data.authorName.size() > 0
+                      && request.resource.data.authorName.size() <= 80
+                      && request.resource.data.title is string
+                      && request.resource.data.title.size() > 0
+                      && request.resource.data.title.size() <= 180
+                      && request.resource.data.description is string
+                      && request.resource.data.description.size() > 0
+                      && request.resource.data.description.size() <= 5000
+                      && request.resource.data.createdAt == request.time
+                      && request.resource.data.likedBy is list
+                      && request.resource.data.likedBy.size() == 0
+                      && request.resource.data.commentCount is int
+                      && request.resource.data.commentCount == 0;
+
+        allow update: if isSignedIn()
+                      && (
+                        (
+                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["likedBy"])
+                          && request.resource.data.likedBy is list
+                          && (
+                            (
+                              !resource.data.likedBy.hasAny([request.auth.uid])
+                              && request.resource.data.likedBy.hasAny([request.auth.uid])
+                              && request.resource.data.likedBy.size() == resource.data.likedBy.size() + 1
+                            )
+                            ||
+                            (
+                              resource.data.likedBy.hasAny([request.auth.uid])
+                              && !request.resource.data.likedBy.hasAny([request.auth.uid])
+                              && request.resource.data.likedBy.size() + 1 == resource.data.likedBy.size()
+                            )
+                          )
+                        )
+                        ||
+                        (
+                          request.resource.data.diff(resource.data).affectedKeys().hasOnly(["commentCount"])
+                          && resource.data.commentCount is int
+                          && request.resource.data.commentCount is int
+                          && request.resource.data.commentCount == resource.data.commentCount + 1
+                        )
+                      );
+
+        allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+
+        match /comments/{commentId} {
+          allow read: if true;
+
+          allow create: if isSignedIn()
+                        && request.resource.data.communityId == communityId
+                        && request.resource.data.postId == postId
+                        && request.resource.data.authorId == request.auth.uid
+                        && request.resource.data.authorName is string
+                        && request.resource.data.authorName.size() > 0
+                        && request.resource.data.authorName.size() <= 80
+                        && request.resource.data.text is string
+                        && request.resource.data.text.size() > 0
+                        && request.resource.data.text.size() <= 2000
+                        && request.resource.data.createdAt == request.time;
+
+          allow delete: if isSignedIn() && resource.data.authorId == request.auth.uid;
+        }
+      }
+    }
+
+    // Live video feed shown in the app's Live tab.
+    // Read is public for guests; writes are restricted to backend/admin tooling.
+    match /liveVideos/{videoId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Flat messages collection support (future chat implementation).
+    match /messages/{messageId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.senderId == request.auth.uid
+                    && request.resource.data.receiverId is string
+                    && canMessageUser(request.resource.data.receiverId);
+
+      allow read, update, delete: if isSignedIn()
+                                  && (resource.data.senderId == request.auth.uid
+                                      || resource.data.receiverId == request.auth.uid);
+    }
+
+    // Lightweight direct messages (Reddit-style inbox).
+    match /chats/{chatId} {
+      allow create: if isSignedIn()
+                    && request.resource.data.participants is list
+                    && request.resource.data.participants.size() == 2
+                    && request.resource.data.participants.hasAny([request.auth.uid])
+                    && request.resource.data.lastMessage is string
+                    && request.resource.data.lastMessage.size() > 0
+                    && request.resource.data.lastMessage.size() <= 5000
+                    && request.resource.data.lastTimestamp == request.time;
+
+      allow read: if isSignedIn()
+                  && resource.data.participants is list
+                  && resource.data.participants.hasAny([request.auth.uid]);
+
+      allow update: if isSignedIn()
+                    && resource.data.participants is list
+                    && resource.data.participants.hasAny([request.auth.uid])
+                    && request.resource.data.participants == resource.data.participants
+                    && request.resource.data.lastMessage is string
+                    && request.resource.data.lastMessage.size() > 0
+                    && request.resource.data.lastMessage.size() <= 5000
+                    && request.resource.data.lastTimestamp == request.time;
+
+      allow delete: if false;
+
+      match /messages/{messageId} {
+        allow create: if isSignedIn()
+                      && get(/databases/$(database)/documents/chats/$(chatId)).data.participants is list
+                      && get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid])
+                      && request.resource.data.senderId == request.auth.uid
+                      && request.resource.data.receiverId is string
+                      && request.resource.data.receiverId != request.auth.uid
+                      && get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.resource.data.receiverId])
+                      && canMessageUser(request.resource.data.receiverId)
+                      && request.resource.data.text is string
+                      && request.resource.data.text.size() > 0
+                      && request.resource.data.text.size() <= 5000
+                      && request.resource.data.timestamp == request.time;
+
+        allow read: if isSignedIn()
+                    && get(/databases/$(database)/documents/chats/$(chatId)).data.participants is list
+                    && get(/databases/$(database)/documents/chats/$(chatId)).data.participants.hasAny([request.auth.uid]);
+
+        allow update, delete: if false;
+      }
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

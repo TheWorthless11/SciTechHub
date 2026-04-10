@@ -16,5 +16,7 @@ struct TrendingView_Previews: PreviewProvider {
     static var previews: some View {
         TrendingView()
             .environmentObject(BookmarkManager())
+            .environmentObject(AuthViewModel())
+            .environmentObject(UserActivityViewModel())
     }
 }

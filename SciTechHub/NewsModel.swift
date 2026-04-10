@@ -8,20 +8,18 @@ struct NewsResponse: Codable {
 
 // MARK: - Article Model
 struct Article: Codable, Identifiable {
-    // Generate a unique ID since NewsAPI doesn't provide one
-    var id = UUID()
+    // Use a stable ID so NavigationLink state is not broken by re-renders.
+    var id: String {
+        if let articleURL = url, !articleURL.isEmpty {
+            return articleURL
+        }
+        return "\(title)|\(description ?? "")|\(urlToImage ?? "")"
+    }
     
     let title: String
     let description: String? // Made optional as NewsAPI sometimes returns null for missing descriptions
     let urlToImage: String?
     let url: String? // The URL to the full article
     
-    // We use CodingKeys to tell Swift to ignore the "id" property when decoding the JSON,
-    // and only look for the fields that actually come from NewsAPI.
-    enum CodingKeys: String, CodingKey {
-        case title
-        case description
-        case urlToImage
-        case url
-    }
+    // Codable automatically maps these stored properties from NewsAPI fields.
 }
