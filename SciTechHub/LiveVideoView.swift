@@ -35,44 +35,44 @@ final class LiveVideoViewModel: ObservableObject {
     // Ordered priority for channels we consider trustworthy for real-time live news.
     private static let liveChannelTargets: [LiveChannelTarget] = [
         LiveChannelTarget(
-            id: "reuters",
-            name: "Reuters",
-            channelID: "UChqUTb7kYRX8-EiaN3XFrSQ",
-            liveURLString: "https://www.youtube.com/@Reuters/live"
-        ),
-        LiveChannelTarget(
-            id: "ap",
-            name: "Associated Press",
-            channelID: "UC52X5wxOL_s5yw0dQk7NtgA",
-            liveURLString: "https://www.youtube.com/@AP/live"
-        ),
-        LiveChannelTarget(
-            id: "dwnews",
-            name: "DW News",
-            channelID: "UCknLrEdhRCp1aegoMqRaCZg",
-            liveURLString: "https://www.youtube.com/@DWNews/live"
-        ),
-        LiveChannelTarget(
-            id: "france24",
-            name: "FRANCE 24 English",
-            channelID: "UCQfwfsi5VrQ8yKZ-UWmAEFg",
-            liveURLString: "https://www.youtube.com/@FRANCE24/live"
-        ),
-        LiveChannelTarget(
-            id: "skynews",
-            name: "Sky News",
-            channelID: "UCoMdktPbSTixAyNGwb-UYkQ",
-            liveURLString: "https://www.youtube.com/@SkyNews/live"
-        ),
-        LiveChannelTarget(
             id: "nasa",
             name: "NASA",
             channelID: "UCLA_DiR1FfKNvjuUpBHmylQ",
             liveURLString: "https://www.youtube.com/@NASA/live"
+        ),
+        LiveChannelTarget(
+            id: "spacex",
+            name: "SpaceX",
+            channelID: "UCtI0Hodo5o5dUb67FeUjDeA",
+            liveURLString: "https://www.youtube.com/@SpaceX/live"
+        ),
+        LiveChannelTarget(
+            id: "mit",
+            name: "MIT",
+            channelID: "UC_7lI0l9h8b9S3eGd6sVZcA",
+            liveURLString: "https://www.youtube.com/@mit/live"
+        ),
+        LiveChannelTarget(
+            id: "techcrunch",
+            name: "TechCrunch",
+            channelID: "UCV9pX8hGxqE1k1q5d8Qd8Kg",
+            liveURLString: "https://www.youtube.com/@TechCrunch/live"
         )
     ]
+    // Hardcoded API key (primary), with Info.plist fallback.
+    // The INFOPLIST_KEY_ prefix in build settings only works for Apple's
+    // known keys — custom keys are NOT injected into the auto-generated
+    // Info.plist, so Bundle lookup alone will always return nil.
+    private static let hardcodedYouTubeAPIKey = "AIzaSyC9lwz5pQJG5abBbCQ3ajywtfityN4J9E0"
 
     private static var youTubeDataAPIKey: String? {
+        // Try the hardcoded key first
+        let primary = hardcodedYouTubeAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !primary.isEmpty && primary != "REPLACE_WITH_YOUR_KEY" {
+            return primary
+        }
+
+        // Fallback: check Info.plist in case a custom plist file is used
         guard let value = Bundle.main.object(forInfoDictionaryKey: "YOUTUBE_DATA_API_KEY") as? String else {
             return nil
         }
@@ -417,18 +417,24 @@ final class LiveVideoViewModel: ObservableObject {
 
 // MARK: - Wrapper
 struct LiveNowWrapperView: View {
+    var useNavigationContainer: Bool = true
+
     var body: some View {
         Group {
-            // NavigationStack is used when available. NavigationView fallback keeps iOS 15 support.
-            if #available(iOS 16.0, *) {
-                NavigationStack {
-                    LiveNowView()
+            if useNavigationContainer {
+                // NavigationStack is used when available. NavigationView fallback keeps iOS 15 support.
+                if #available(iOS 16.0, *) {
+                    NavigationStack {
+                        LiveNowView()
+                    }
+                } else {
+                    NavigationView {
+                        LiveNowView()
+                    }
+                    .navigationViewStyle(StackNavigationViewStyle())
                 }
             } else {
-                NavigationView {
-                    LiveNowView()
-                }
-                .navigationViewStyle(StackNavigationViewStyle())
+                LiveNowView()
             }
         }
     }
@@ -462,6 +468,7 @@ struct LiveNowView: View {
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 12)
+                    .tabBarOverlayBottomPadding()
                 }
             }
         }
@@ -476,26 +483,26 @@ struct LiveNowView: View {
         .onReceive(autoRefreshTimer) { _ in
             viewModel.loadEvents()
         }
-        .onChange(of: viewModel.restrictionToastMessage) { message in
-            guard let message = message else {
-                return
-            }
+        .padding(16)
+        .onChange(of: viewModel.restrictionToastMessage) {
+            if let message = viewModel.restrictionToastMessage {
 
-            restrictionToastText = message
-            withAnimation(.easeInOut(duration: 0.2)) {
-                showRestrictionToast = true
-            }
-
-            let currentMessage = message
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-                guard restrictionToastText == currentMessage else {
-                    return
-                }
+                restrictionToastText = message
 
                 withAnimation(.easeInOut(duration: 0.2)) {
-                    showRestrictionToast = false
+                    showRestrictionToast = true
                 }
-                viewModel.clearRestrictionToastMessage()
+
+                let currentMessage = message
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                    guard restrictionToastText == currentMessage else { return }
+
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        showRestrictionToast = false
+                    }
+
+                    viewModel.clearRestrictionToastMessage()
+                }
             }
         }
         .overlay(alignment: .top) {
@@ -890,6 +897,10 @@ struct YouTubeWebView: UIViewRepresentable {
             return nil
         }
 
+        if components.host == "www.youtube.com" {
+            components.host = "www.youtube-nocookie.com"
+        }
+
         var items = components.queryItems ?? []
 
         func setItem(_ name: String, _ value: String) {
@@ -904,6 +915,8 @@ struct YouTubeWebView: UIViewRepresentable {
         setItem("rel", "0")
         setItem("modestbranding", "1")
         setItem("fs", "1")
+        setItem("enablejsapi", "1")
+        setItem("origin", "https://www.youtube.com")
         setItem("autoplay", autoplay ? "1" : "0")
         setItem("mute", autoplay ? "1" : "0")
 
@@ -951,6 +964,10 @@ struct YouTubeWebView: UIViewRepresentable {
             didFail navigation: WKNavigation!,
             withError error: Error
         ) {
+            if shouldIgnoreNavigationError(error) {
+                return
+            }
+
             DispatchQueue.main.async {
                 self.parent.hasLoadingError = true
                 self.parent.hasEmbeddingRestriction = false
@@ -963,11 +980,27 @@ struct YouTubeWebView: UIViewRepresentable {
             didFailProvisionalNavigation navigation: WKNavigation!,
             withError error: Error
         ) {
+            if shouldIgnoreNavigationError(error) {
+                return
+            }
+
             DispatchQueue.main.async {
                 self.parent.hasLoadingError = true
                 self.parent.hasEmbeddingRestriction = false
             }
             print("YouTube provisional load failed: \(error.localizedDescription)")
+        }
+
+        private func shouldIgnoreNavigationError(_ error: Error) -> Bool {
+            let nsError = error as NSError
+            if nsError.domain == NSURLErrorDomain,
+               nsError.code == NSURLErrorCancelled {
+                return true
+            }
+
+            let message = nsError.localizedDescription.lowercased()
+            return message.contains("frame load interrupted")
+                || message.contains("cancelled")
         }
     }
 }

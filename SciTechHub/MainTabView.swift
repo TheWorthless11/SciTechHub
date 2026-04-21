@@ -1,69 +1,61 @@
 import SwiftUI
 import FirebaseAuth
 import FirebaseFirestore
+import UIKit
+
+private struct PersistentTabBarHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 96
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
 
 struct MainTabView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var bookmarkManager: BookmarkManager
+    @Namespace private var tabNamespace
+    @State private var selectedTab: AppRootTab = .home
+    // Reserve enough bottom space so content never falls under the persistent tab bar.
+    @State private var persistentTabBarReservedHeight: CGFloat = 96
     
     var body: some View {
-        TabView {
-            // Tab 1: Home
-            HomeView()
-                .tabItem {
-                    Label("Home", systemImage: "house")
-                }
-            
-            // Tab 2: Trending
-            TrendingView()
-                .tabItem {
-                    Label("Trending", systemImage: "flame")
-                }
-            
-            // Tab 3: Bookmarks
-            BookmarkWrapperView()
-                .tabItem {
-                    Label("Saved", systemImage: "bookmark")
-                }
-            
-            // Tab 4: Community
-            CommunityWrapperView()
-                .tabItem {
-                    Label("Community", systemImage: "person.3.sequence.fill")
-                }
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
 
-            // Tab 5: Friends
-            FriendsHubWrapperView()
-                .tabItem {
-                    Label("Friends", systemImage: "person.2")
-                }
-
-            // Tab 6: Inbox
-            InboxWrapperView()
-                .tabItem {
-                    Label("Inbox", systemImage: "bubble.left.and.bubble.right")
-                }
-
-            // Tab 7: Notes
-            NotesWrapperView()
-                .tabItem {
-                    Label("My Notes", systemImage: "note.text")
-                }
-
-            // Tab 8: Live
-            LiveNowWrapperView()
-                .tabItem {
-                    Label("Live", systemImage: "dot.radiowaves.left.and.right")
-                }
-
-            // Tab 9: Scan
-            ScanWrapperView()
-                .tabItem {
-                    Label("Scan", systemImage: "doc.text.viewfinder")
+            activeTabView
+                .environment(\.tabBarOverlayHeight, persistentTabBarReservedHeight)
+                .id(selectedTab)
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .trailing).combined(with: .opacity),
+                        removal: .move(edge: .leading).combined(with: .opacity)
+                    )
+                )
+        }
+        .animation(.spring(response: 0.45, dampingFraction: 0.82), value: selectedTab)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            Color.clear
+                .frame(height: persistentTabBarReservedHeight)
+        }
+        .overlay(alignment: .bottom) {
+            AnimatedTabBar(selectedTab: $selectedTab, namespace: tabNamespace)
+                .padding(.top, 6)
+                .padding(.bottom, 4)
+                .background(AppTheme.background.opacity(0.78))
+                .background {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(key: PersistentTabBarHeightPreferenceKey.self, value: proxy.size.height)
+                    }
                 }
         }
-        // Change the accent color of selected tab
-        .accentColor(.blue)
+        .onPreferenceChange(PersistentTabBarHeightPreferenceKey.self) { measuredHeight in
+            let resolvedHeight = max(88, measuredHeight)
+            if abs(resolvedHeight - persistentTabBarReservedHeight) > 0.5 {
+                persistentTabBarReservedHeight = resolvedHeight
+            }
+        }
         .onAppear {
             bookmarkManager.loadBookmarks()
             bookmarkManager.loadBookmarkedArticles()
@@ -73,6 +65,22 @@ struct MainTabView: View {
             bookmarkManager.loadBookmarks()
             bookmarkManager.loadBookmarkedArticles()
             bookmarkManager.loadLikedArticles()
+        }
+    }
+
+    @ViewBuilder
+    private var activeTabView: some View {
+        switch selectedTab {
+        case .home:
+            HomeView()
+        case .trending:
+            TrendingView()
+        case .saved:
+            BookmarkWrapperView()
+        case .community:
+            CommunityWrapperView()
+        case .more:
+            MoreHubWrapperView()
         }
     }
 }
@@ -96,6 +104,134 @@ struct NotesWrapperView: View {
             NotesView()
         }
         .navigationViewStyle(StackNavigationViewStyle())
+    }
+}
+
+// Wrapper for Research papers to keep tab navigation isolated
+struct ResearchWrapperView: View {
+    var useNavigationContainer: Bool = true
+
+    var body: some View {
+        Group {
+            if useNavigationContainer {
+                NavigationView {
+                    ResearchView()
+                }
+                .navigationViewStyle(StackNavigationViewStyle())
+            } else {
+                ResearchView()
+            }
+        }
+    }
+}
+
+struct MoreHubWrapperView: View {
+    var body: some View {
+        NavigationView {
+            MoreHubView()
+        }
+        .navigationViewStyle(StackNavigationViewStyle())
+    }
+}
+
+struct MoreHubView: View {
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 12) {
+                moreCard(
+                    title: "Friends",
+                    subtitle: "Discover and message people with shared interests.",
+                    icon: "person.2.fill"
+                ) {
+                    FriendsHubWrapperView(useNavigationContainer: false)
+                }
+
+                moreCard(
+                    title: "Inbox",
+                    subtitle: "Open your direct messages and unread chats.",
+                    icon: "bubble.left.and.bubble.right.fill"
+                ) {
+                    InboxWrapperView(useNavigationContainer: false)
+                }
+
+                moreCard(
+                    title: "My Notes",
+                    subtitle: "Read and manage your private article notes.",
+                    icon: "note.text"
+                ) {
+                    NotesView()
+                }
+
+                moreCard(
+                    title: "Live",
+                    subtitle: "Join the current live video and discussions.",
+                    icon: "dot.radiowaves.left.and.right"
+                ) {
+                    LiveNowWrapperView(useNavigationContainer: false)
+                }
+
+                moreCard(
+                    title: "Scan",
+                    subtitle: "Scan documents or posters for quick extraction.",
+                    icon: "doc.text.viewfinder"
+                ) {
+                    ScanWrapperView(useNavigationContainer: false)
+                }
+
+                moreCard(
+                    title: "Research",
+                    subtitle: "Explore recent papers with smart recommendations.",
+                    icon: "doc.text.magnifyingglass"
+                ) {
+                    ResearchWrapperView(useNavigationContainer: false)
+                }
+            }
+            .padding(.horizontal, 16)
+            .padding(.vertical, 14)
+            .tabBarOverlayBottomPadding()
+        }
+        .background(AppTheme.background.ignoresSafeArea())
+        .navigationTitle("More")
+    }
+
+    private func moreCard<Destination: View>(
+        title: String,
+        subtitle: String,
+        icon: String,
+        @ViewBuilder destination: () -> Destination
+    ) -> some View {
+        NavigationLink(destination: destination()) {
+            HStack(spacing: 12) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(AppTheme.accentGradient)
+                        .frame(width: 42, height: 42)
+
+                    Image(systemName: icon)
+                        .font(.headline)
+                        .foregroundColor(.white)
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(.headline)
+                        .foregroundColor(AppTheme.titleText)
+
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundColor(AppTheme.subtitleText)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundColor(AppTheme.subtitleText)
+            }
+            .padding(14)
+            .glassCard(cornerRadius: 18)
+        }
+        .buttonStyle(.plain)
     }
 }
 
@@ -159,24 +295,36 @@ final class CommunityViewModel: ObservableObject {
     private let db = Firestore.firestore()
     private var communitiesListener: ListenerRegistration?
 
-    private let defaultCommunities: [CommunityTopic] = [
+    private static let fallbackCommunities: [CommunityTopic] = [
         CommunityTopic(
-            id: "ai",
+            id: "community_ai",
             name: "AI",
-            description: "Discuss artificial intelligence, machine learning, and new breakthroughs.",
+            description: "Discuss machine learning, generative models, and practical AI experiments.",
             symbol: "brain.head.profile"
         ),
         CommunityTopic(
-            id: "space",
+            id: "community_robotics",
+            name: "Robotics",
+            description: "Talk about autonomous systems, control, sensors, and real-world robotics builds.",
+            symbol: "gearshape.2.fill"
+        ),
+        CommunityTopic(
+            id: "community_climate",
+            name: "Climate",
+            description: "Share climate research, sustainability projects, and environmental technology ideas.",
+            symbol: "leaf.fill"
+        ),
+        CommunityTopic(
+            id: "community_space",
             name: "Space",
-            description: "Talk about space exploration, astronomy, and cosmic discoveries.",
+            description: "Explore astronomy, missions, propulsion, and the future of space engineering.",
             symbol: "sparkles"
         ),
         CommunityTopic(
-            id: "technology",
-            name: "Technology",
-            description: "Share the latest discussions on software, hardware, and innovation.",
-            symbol: "desktopcomputer"
+            id: "community_health",
+            name: "Health",
+            description: "Discuss biomedical innovation, diagnostics, digital health, and public health research.",
+            symbol: "cross.case.fill"
         )
     ]
 
@@ -185,7 +333,10 @@ final class CommunityViewModel: ObservableObject {
     }
 
     func startListening() {
-        communitiesListener?.remove()
+        if communitiesListener != nil {
+            return
+        }
+
         isLoading = true
         errorMessage = nil
 
@@ -196,26 +347,35 @@ final class CommunityViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     if let error = error {
                         self.errorMessage = self.friendlyErrorMessage(for: error, action: "load communities")
-                        self.communities = self.defaultCommunities
+                        if self.communities.isEmpty {
+                            self.communities = Self.fallbackCommunities
+                        }
                         self.isLoading = false
                         return
                     }
 
-                    let firestoreCommunities: [CommunityTopic] = (snapshot?.documents ?? []).compactMap { document in
+                    let docs = snapshot?.documents ?? []
+                    let remoteCommunities = docs.compactMap { document in
                         self.community(from: document)
                     }
 
-                    var merged: [String: CommunityTopic] = [:]
-                    self.defaultCommunities.forEach { merged[$0.id] = $0 }
-                    firestoreCommunities.forEach { merged[$0.id] = $0 }
-
-                    self.communities = merged.values.sorted {
-                        $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
-                    }
+                    // Keep Community discoverable even when backend seed data is missing.
+                    self.communities = remoteCommunities.isEmpty ? Self.fallbackCommunities : remoteCommunities
                     self.errorMessage = nil
                     self.isLoading = false
                 }
             }
+    }
+
+    func stopListening(clearState: Bool = false) {
+        communitiesListener?.remove()
+        communitiesListener = nil
+
+        if clearState {
+            communities = []
+            isLoading = false
+            errorMessage = nil
+        }
     }
 
     private func community(from document: QueryDocumentSnapshot) -> CommunityTopic? {
@@ -485,6 +645,7 @@ final class CommentViewModel: ObservableObject {
     @Published var draftCommentText = ""
     @Published private(set) var isLoading = false
     @Published private(set) var isPosting = false
+    @Published private(set) var pendingDeleteCommentIds: Set<String> = []
     @Published var errorMessage: String?
 
     private let db = Firestore.firestore()
@@ -525,8 +686,10 @@ final class CommentViewModel: ObservableObject {
                         return
                     }
 
-                    self.comments = (snapshot?.documents ?? []).compactMap { document in
-                        self.comment(from: document)
+                    withAnimation(.spring(response: 0.34, dampingFraction: 0.84)) {
+                        self.comments = (snapshot?.documents ?? []).compactMap { document in
+                            self.comment(from: document)
+                        }
                     }
                     self.errorMessage = nil
                     self.isLoading = false
@@ -545,6 +708,7 @@ final class CommentViewModel: ObservableObject {
             draftCommentText = ""
             isLoading = false
             isPosting = false
+            pendingDeleteCommentIds = []
             errorMessage = nil
         }
     }
@@ -604,6 +768,50 @@ final class CommentViewModel: ObservableObject {
                     }
                 }
         }
+    }
+
+    func deleteComment(_ comment: CommunityComment) {
+        guard let user = Auth.auth().currentUser else {
+            errorMessage = "Login required to manage comments."
+            return
+        }
+
+        guard comment.authorId == user.uid else {
+            errorMessage = "You can only delete your own comments."
+            return
+        }
+
+        guard let communityId = activeCommunityId,
+              let postId = activePostId else {
+            errorMessage = "Unable to resolve comment target."
+            return
+        }
+
+        if pendingDeleteCommentIds.contains(comment.id) {
+            return
+        }
+
+        pendingDeleteCommentIds.insert(comment.id)
+        errorMessage = nil
+
+        commentsCollection(communityId: communityId, postId: postId)
+            .document(comment.id)
+            .delete { error in
+                DispatchQueue.main.async {
+                    self.pendingDeleteCommentIds.remove(comment.id)
+
+                    if let error = error {
+                        self.errorMessage = self.friendlyErrorMessage(for: error, action: "delete comment")
+                        return
+                    }
+
+                    self.postsCollection(for: communityId)
+                        .document(postId)
+                        .updateData(["commentCount": FieldValue.increment(Int64(-1))])
+
+                    self.errorMessage = nil
+                }
+            }
     }
 
     private func postsCollection(for communityId: String) -> CollectionReference {
@@ -678,28 +886,68 @@ struct CommunityWrapperView: View {
 
 struct CommunityListView: View {
     @StateObject private var communityViewModel = CommunityViewModel()
+    @State private var selectedCommunityId: String?
 
     var body: some View {
-        Group {
-            if communityViewModel.isLoading && communityViewModel.communities.isEmpty {
-                ProgressView("Loading communities...")
-            } else if communityViewModel.communities.isEmpty {
-                Text("No communities available right now.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .padding()
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 12) {
-                        ForEach(communityViewModel.communities) { community in
-                            NavigationLink(destination: CommunityDetailView(community: community)) {
-                                CommunityListCardView(community: community)
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
+
+            Group {
+                if communityViewModel.isLoading && communityViewModel.communities.isEmpty {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                CommunityCardSkeletonView()
                             }
-                            .buttonStyle(PlainButtonStyle())
                         }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .tabBarOverlayBottomPadding()
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                } else if communityViewModel.communities.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "person.3.sequence.fill")
+                            .font(.system(size: 42, weight: .semibold))
+                            .foregroundStyle(AppTheme.accentPrimary)
+
+                        Text("No communities available")
+                            .font(.headline)
+                            .foregroundColor(AppTheme.titleText)
+
+                        Text("Please check again shortly.")
+                            .font(.subheadline)
+                            .foregroundColor(AppTheme.subtitleText)
+                    }
+                    .padding(20)
+                    .glassCard(cornerRadius: 22)
+                    .padding(.horizontal, 20)
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(Array(communityViewModel.communities.enumerated()), id: \.element.id) { index, community in
+                                NavigationLink(destination: CommunityDetailView(community: community)) {
+                                    CommunityCardView(
+                                        community: community,
+                                        isSelected: selectedCommunityId == community.id,
+                                        appearDelay: Double(index) * 0.055
+                                    )
+                                }
+                                .buttonStyle(TopicCardButtonStyle())
+                                .simultaneousGesture(
+                                    TapGesture().onEnded {
+                                        HapticFeedback.tap(.light)
+                                        withAnimation(.spring(response: 0.35, dampingFraction: 0.72)) {
+                                            selectedCommunityId = community.id
+                                        }
+                                    }
+                                )
+                            }
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                        .tabBarOverlayBottomPadding()
+                    }
+                    .coordinateSpace(name: "communityScroll")
                 }
             }
         }
@@ -713,7 +961,11 @@ struct CommunityListView: View {
                     .font(.footnote)
                     .foregroundColor(.red)
                     .padding(10)
-                    .background(Color.red.opacity(0.1))
+                    .background(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.red.opacity(0.25), lineWidth: 1)
+                    )
                     .cornerRadius(10)
                     .padding(.top, 8)
                     .padding(.horizontal, 16)
@@ -722,34 +974,142 @@ struct CommunityListView: View {
     }
 }
 
-private struct CommunityListCardView: View {
+struct CommunityCardView: View {
     let community: CommunityTopic
+    var isSelected: Bool = false
+    var appearDelay: Double = 0
+
+    @State private var didAppear = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: community.symbol)
-                .font(.title2)
-                .foregroundColor(.indigo)
-                .frame(width: 34)
+        GeometryReader { proxy in
+            let minY = proxy.frame(in: .named("communityScroll")).minY
+            let parallax = max(-8, min(8, -minY * 0.03))
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(community.name)
-                    .font(.headline)
-                    .foregroundColor(.primary)
+            HStack(alignment: .top, spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(.ultraThinMaterial)
 
-                Text(community.description)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .lineLimit(2)
+                    Circle()
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.cyan.opacity(0.35), Color.blue.opacity(0.16)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+
+                    Image(systemName: community.symbol)
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(AppTheme.titleText)
+                }
+                .frame(width: 54, height: 54)
+                .shadow(color: AppTheme.accentPrimary.opacity(0.24), radius: 12, x: 0, y: 0)
+
+                VStack(alignment: .leading, spacing: 7) {
+                    Text(community.name)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(AppTheme.titleText)
+
+                    Text(community.description)
+                        .font(.subheadline)
+                        .foregroundStyle(AppTheme.subtitleText)
+                        .lineLimit(2)
+                }
+
+                Spacer(minLength: 0)
+
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(AppTheme.subtitleText)
+                    .padding(.top, 3)
+            }
+            .padding(18)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(cardBackground)
+            .overlay {
+                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    .stroke(Color.white.opacity(0.1), lineWidth: 1)
+            }
+            .overlay {
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(AppTheme.accentPrimary.opacity(0.38), lineWidth: 1.2)
+                        .shadow(color: AppTheme.accentPrimary.opacity(0.35), radius: 14, x: 0, y: 0)
+                }
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: Color.black.opacity(0.11), radius: 14, x: 0, y: 10)
+            .offset(y: parallax)
+            .opacity(didAppear ? 1 : 0)
+            .offset(y: didAppear ? 0 : 12)
+            .animation(.easeOut(duration: 0.35).delay(appearDelay), value: didAppear)
+            .animation(.easeInOut(duration: 0.22), value: isSelected)
+            .onAppear {
+                if !didAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + appearDelay) {
+                        didAppear = true
+                    }
+                }
+            }
+        }
+        .frame(height: 124)
+    }
+
+    private var cardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color("Card").opacity(0.38))
+
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(.ultraThinMaterial)
+
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.26), Color.black.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [AppTheme.accentPrimary.opacity(0.18), Color.clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .blur(radius: 12)
+                .padding(8)
+        }
+    }
+}
+
+private struct CommunityCardSkeletonView: View {
+    var body: some View {
+        HStack(spacing: 14) {
+            Circle()
+                .fill(AppTheme.cardBackground.opacity(0.55))
+                .frame(width: 54, height: 54)
+
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(AppTheme.cardBackground.opacity(0.55))
+                    .frame(height: 18)
+
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(AppTheme.cardBackground.opacity(0.45))
+                    .frame(height: 15)
             }
 
-            Spacer(minLength: 0)
+            Spacer()
         }
-        .padding(14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(14)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .padding(18)
+        .glassCard(cornerRadius: 22)
+        .shimmering()
     }
 }
 
@@ -758,83 +1118,48 @@ struct CommunityDetailView: View {
 
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var postViewModel = PostViewModel()
+    @Namespace private var sortNamespace
 
     @State private var showCreatePostSheet = false
     @State private var showLoginPrompt = false
     @State private var showLoginSheet = false
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
-            VStack(alignment: .leading, spacing: 10) {
-                Picker("Sort", selection: $postViewModel.sortOption) {
-                    ForEach(CommunityPostSortOption.allCases) { option in
-                        Text(option.title).tag(option)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
 
-                if postViewModel.isLoading && postViewModel.posts.isEmpty {
-                    ProgressView("Loading posts...")
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
-                } else if postViewModel.sortedPosts.isEmpty {
-                    VStack(spacing: 10) {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.system(size: 42))
-                            .foregroundColor(.secondary)
-                        Text("No posts yet")
-                            .font(.headline)
-                        Text("Tap + to create the first post in this community.")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        LazyVStack(spacing: 12) {
-                            ForEach(postViewModel.sortedPosts) { post in
-                                CommunityPostCardView(
-                                    community: community,
-                                    post: post,
-                                    isLiked: post.likedBy.contains(authViewModel.user?.uid ?? ""),
-                                    isVoting: postViewModel.pendingVotePostIds.contains(post.id),
-                                    onVoteTap: {
-                                        if authViewModel.isLoggedIn {
-                                            postViewModel.toggleUpvote(for: post)
-                                        } else {
-                                            showLoginPrompt = true
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                    }
-                }
-            }
+            VStack(alignment: .leading, spacing: 12) {
+                AnimatedSegmentControl(selection: $postViewModel.sortOption, namespace: sortNamespace)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 8)
 
-            Button {
-                if authViewModel.isLoggedIn {
-                    showCreatePostSheet = true
-                } else {
-                    showLoginPrompt = true
-                }
-            } label: {
-                Image(systemName: authViewModel.isLoggedIn ? "plus" : "lock.fill")
-                    .font(.headline)
-                    .foregroundColor(.white)
-                    .padding(18)
-                    .background(Color.indigo)
-                    .clipShape(Circle())
-                    .shadow(color: Color.black.opacity(0.22), radius: 6, x: 0, y: 4)
+                Rectangle()
+                    .fill(AppTheme.cardBorder.opacity(0.35))
+                    .frame(height: 1)
+                    .padding(.horizontal, 16)
+
+                discussionContent
             }
-            .padding(.trailing, 18)
-            .padding(.bottom, 18)
         }
         .navigationTitle(community.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button {
+                    HapticFeedback.tap(.medium)
+                    if authViewModel.isLoggedIn {
+                        showCreatePostSheet = true
+                    } else {
+                        showLoginPrompt = true
+                    }
+                } label: {
+                    Image(systemName: authViewModel.isLoggedIn ? "plus.circle.fill" : "lock.circle.fill")
+                        .font(.title3.weight(.semibold))
+                        .foregroundColor(AppTheme.accentPrimary)
+                }
+                .accessibilityLabel(authViewModel.isLoggedIn ? "Create post" : "Login to create post")
+            }
+        }
         .onAppear {
             postViewModel.startListening(for: community)
         }
@@ -847,7 +1172,11 @@ struct CommunityDetailView: View {
                     .font(.footnote)
                     .foregroundColor(.red)
                     .padding(10)
-                    .background(Color.red.opacity(0.1))
+                    .background(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .stroke(Color.red.opacity(0.24), lineWidth: 1)
+                    )
                     .cornerRadius(10)
                     .padding(.horizontal, 16)
                     .padding(.top, 8)
@@ -869,50 +1198,99 @@ struct CommunityDetailView: View {
                 .environmentObject(authViewModel)
         }
     }
+
+    @ViewBuilder
+    private var discussionContent: some View {
+        if postViewModel.isLoading && postViewModel.posts.isEmpty {
+            ScrollView {
+                LazyVStack(spacing: 14) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        PostCardSkeletonView()
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .tabBarOverlayBottomPadding()
+            }
+        } else if postViewModel.sortedPosts.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "bubble.left.and.bubble.right")
+                    .font(.system(size: 42))
+                    .foregroundColor(AppTheme.accentPrimary)
+                Text("No posts yet")
+                    .font(.headline)
+                    .foregroundColor(AppTheme.titleText)
+                Text("Tap + to create the first post in this community.")
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.subtitleText)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 14) {
+                    ForEach(postViewModel.sortedPosts) { post in
+                        PostCardView(
+                            community: community,
+                            post: post,
+                            isLiked: post.likedBy.contains(authViewModel.user?.uid ?? ""),
+                            isVoting: postViewModel.pendingVotePostIds.contains(post.id),
+                            onVoteTap: {
+                                if authViewModel.isLoggedIn {
+                                    HapticFeedback.tap(.light)
+                                    postViewModel.toggleUpvote(for: post)
+                                } else {
+                                    showLoginPrompt = true
+                                }
+                            }
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .tabBarOverlayBottomPadding()
+            }
+        }
+    }
 }
 
-private struct CommunityPostCardView: View {
+private struct PostCardView: View {
     let community: CommunityTopic
     let post: CommunityPost
     let isLiked: Bool
     let isVoting: Bool
     let onVoteTap: () -> Void
 
+    @State private var didAppear = false
+    @State private var cardTapPulse = false
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             NavigationLink(destination: CommunityPostDetailView(community: community, post: post)) {
                 VStack(alignment: .leading, spacing: 8) {
                     Text(post.title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(.title3.weight(.bold))
+                        .foregroundColor(AppTheme.titleText)
                         .multilineTextAlignment(.leading)
 
                     Text(post.description)
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(AppTheme.subtitleText)
                         .lineLimit(3)
                         .multilineTextAlignment(.leading)
                 }
             }
             .buttonStyle(PlainButtonStyle())
 
-            HStack(spacing: 12) {
-                Text("u/\(post.authorName)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Text(relativeTimeString(for: post.createdAt))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-
-                Spacer()
-
-                Label("\(post.commentCount)", systemImage: "text.bubble")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            HStack(spacing: 8) {
+                metadataPill(icon: "person.fill", text: "u/\(post.authorName)")
+                metadataPill(icon: "clock", text: relativeTimeString(for: post.createdAt))
+                metadataPill(icon: "arrow.up", text: "\(post.likeCount)")
+                metadataPill(icon: "bubble.left", text: "\(post.commentCount)")
+                Spacer(minLength: 0)
             }
 
-            HStack {
+            HStack(spacing: 10) {
                 Button(action: onVoteTap) {
                     HStack(spacing: 4) {
                         if isVoting {
@@ -925,30 +1303,184 @@ private struct CommunityPostCardView: View {
                         Text("\(post.likeCount)")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .foregroundColor(isLiked ? .indigo : .secondary)
+                    .foregroundColor(isLiked ? AppTheme.accentPrimary : AppTheme.subtitleText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background((isLiked ? AppTheme.accentPrimary : AppTheme.cardBackground).opacity(0.13))
+                    .clipShape(Capsule())
                 }
                 .buttonStyle(.plain)
 
                 Spacer()
 
                 NavigationLink(destination: CommunityPostDetailView(community: community, post: post)) {
-                    Text("View Discussion")
-                        .font(.caption.weight(.semibold))
+                    HStack(spacing: 6) {
+                        Image(systemName: "bubble.left.and.bubble.right.fill")
+                        Text("View Discussion")
+                            .font(.caption.weight(.semibold))
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .foregroundColor(.white)
+                    .background(AppTheme.accentGradient)
+                    .clipShape(Capsule())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(SpringyButtonStyle())
+                .simultaneousGesture(
+                    TapGesture().onEnded {
+                        HapticFeedback.tap(.light)
+                    }
+                )
             }
         }
-        .padding(14)
+        .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(14)
-        .shadow(color: Color.black.opacity(0.05), radius: 4, x: 0, y: 2)
+        .background(postBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Color.black.opacity(cardTapPulse ? 0.16 : 0.1), radius: cardTapPulse ? 16 : 12, x: 0, y: cardTapPulse ? 10 : 8)
+        .scaleEffect(cardTapPulse ? 0.985 : 1)
+        .opacity(didAppear ? 1 : 0)
+        .offset(y: didAppear ? 0 : 10)
+        .animation(.easeOut(duration: 0.3), value: didAppear)
+        .animation(.spring(response: 0.28, dampingFraction: 0.72), value: cardTapPulse)
+        .onTapGesture {
+            HapticFeedback.tap(.light)
+            cardTapPulse = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                cardTapPulse = false
+            }
+        }
+        .onAppear {
+            if !didAppear {
+                didAppear = true
+            }
+        }
+    }
+
+    private var postBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(Color("Card").opacity(0.36))
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.24), Color.black.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [AppTheme.accentPrimary.opacity(0.16), Color.clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .blur(radius: 12)
+                .padding(8)
+        }
+    }
+
+    private func metadataPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(AppTheme.subtitleText)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(AppTheme.cardBackground.opacity(0.4))
+        .clipShape(Capsule())
     }
 
     private func relativeTimeString(for date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+private struct AnimatedSegmentControl: View {
+    @Binding var selection: CommunityPostSortOption
+    let namespace: Namespace.ID
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(CommunityPostSortOption.allCases) { option in
+                let isActive = selection == option
+
+                Button {
+                    HapticFeedback.tap(.light)
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.78)) {
+                        selection = option
+                    }
+                } label: {
+                    Text(option.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(isActive ? .white : AppTheme.subtitleText)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background {
+                            if isActive {
+                                Capsule()
+                                    .fill(AppTheme.accentGradient)
+                                    .matchedGeometryEffect(id: "community_sort_indicator", in: namespace)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(6)
+        .background(
+            Capsule()
+                .fill(Color("Card").opacity(0.4))
+                .overlay(
+                    Capsule()
+                        .stroke(Color.white.opacity(0.1), lineWidth: 1)
+                )
+        )
+        .shadow(color: Color.black.opacity(0.09), radius: 10, x: 0, y: 5)
+    }
+}
+
+private struct PostCardSkeletonView: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(AppTheme.cardBackground.opacity(0.58))
+                .frame(height: 18)
+
+            RoundedRectangle(cornerRadius: 8, style: .continuous)
+                .fill(AppTheme.cardBackground.opacity(0.48))
+                .frame(height: 14)
+
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(AppTheme.cardBackground.opacity(0.45))
+                    .frame(width: 90, height: 24)
+
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(AppTheme.cardBackground.opacity(0.45))
+                    .frame(width: 110, height: 24)
+
+                Spacer()
+            }
+        }
+        .padding(16)
+        .glassCard(cornerRadius: 20)
+        .shimmering()
     }
 }
 
@@ -1006,109 +1538,117 @@ struct CommunityPostDetailView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var commentViewModel = CommentViewModel()
     @State private var showLoginSheet = false
+    @State private var replyTargetName: String?
+    @FocusState private var isCommentInputFocused: Bool
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
-                Text(post.title)
-                    .font(.title3)
-                    .fontWeight(.bold)
+        ZStack {
+            detailBackground.ignoresSafeArea()
 
-                HStack(spacing: 12) {
-                    Text("u/\(post.authorName)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 16) {
+                    PostHeaderView(post: post, accentColor: accentColor, cardColor: cardColor)
+                        .padding(.top, 8)
 
-                    Text(relativeTimeString(for: post.createdAt))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    commentsSectionHeader
 
-                    Label("\(post.likeCount)", systemImage: "arrow.up.circle")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-
-                Text(post.description)
-                    .font(.body)
-
-                Divider()
-
-                Label("Comments", systemImage: "text.bubble")
-                    .font(.headline)
-
-                if commentViewModel.isLoading {
-                    HStack(spacing: 8) {
-                        ProgressView()
-                        Text("Loading comments...")
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.top, 4)
-                } else if commentViewModel.comments.isEmpty {
-                    Text("No comments yet. Start the conversation.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                } else {
-                    VStack(spacing: 10) {
-                        ForEach(commentViewModel.comments) { comment in
-                            CommunityCommentRowView(comment: comment)
+                    if commentViewModel.isLoading {
+                        VStack(spacing: 12) {
+                            ForEach(0..<3, id: \.self) { _ in
+                                CommentCardSkeletonView()
+                            }
                         }
+                    } else if commentViewModel.comments.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: "bubble.left.and.bubble.right")
+                                .font(.system(size: 30, weight: .semibold))
+                                .foregroundStyle(accentColor)
+
+                            Text("No comments yet")
+                                .font(.headline)
+                                .foregroundStyle(AppTheme.titleText)
+
+                            Text("Be the first to start this discussion.")
+                                .font(.subheadline)
+                                .foregroundStyle(AppTheme.subtitleText)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 20)
+                        .glassCard(cornerRadius: 20)
+                    } else {
+                        VStack(spacing: 12) {
+                            ForEach(Array(commentViewModel.comments.enumerated()), id: \.element.id) { index, comment in
+                                CommentCardView(
+                                    comment: comment,
+                                    accentColor: accentColor,
+                                    cardColor: cardColor,
+                                    canDelete: comment.authorId == authViewModel.user?.uid,
+                                    isDeleting: commentViewModel.pendingDeleteCommentIds.contains(comment.id),
+                                    appearDelay: Double(index) * 0.045,
+                                    onReply: {
+                                        reply(to: comment)
+                                    },
+                                    onDelete: {
+                                        delete(comment)
+                                    }
+                                )
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+
+                                if index < commentViewModel.comments.count - 1 {
+                                    Rectangle()
+                                        .fill(AppTheme.cardBorder.opacity(0.28))
+                                        .frame(height: 1)
+                                        .padding(.horizontal, 8)
+                                }
+                            }
+                        }
+                        .animation(.spring(response: 0.36, dampingFraction: 0.84), value: commentViewModel.comments.map(\.id))
+                    }
+
+                    if let error = commentViewModel.errorMessage {
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundColor(.red)
+                            .padding(10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(.ultraThinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                    .stroke(Color.red.opacity(0.24), lineWidth: 1)
+                            )
+                            .cornerRadius(10)
                     }
                 }
-
-                if let error = commentViewModel.errorMessage {
-                    Text(error)
-                        .font(.footnote)
-                        .foregroundColor(.red)
-                        .padding(10)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color.red.opacity(0.1))
-                        .cornerRadius(10)
-                }
+                .padding(.horizontal, 16)
+                .tabBarOverlayBottomPadding(extra: 84)
             }
-            .padding()
         }
         .navigationTitle(community.name)
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 8) {
-                if authViewModel.isLoggedIn {
-                    HStack(spacing: 10) {
-                        TextField("Add a comment...", text: $commentViewModel.draftCommentText)
-                            .textFieldStyle(.roundedBorder)
-
-                        Button(commentViewModel.isPosting ? "Posting..." : "Post") {
-                            commentViewModel.postComment()
-                        }
-                        .font(.subheadline.weight(.semibold))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .foregroundColor(.white)
-                        .background(commentViewModel.canPost ? Color.indigo : Color.gray)
-                        .cornerRadius(10)
-                        .disabled(!commentViewModel.canPost)
-                    }
-                } else {
-                    Button {
-                        showLoginSheet = true
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "person.crop.circle.badge.plus")
-                            Text("Login to comment")
-                                .font(.subheadline.weight(.semibold))
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .foregroundColor(.white)
-                        .background(Color.indigo)
-                        .cornerRadius(10)
-                    }
+        .overlay(alignment: .bottom) {
+            CommentInputBar(
+                isLoggedIn: authViewModel.isLoggedIn,
+                draftText: $commentViewModel.draftCommentText,
+                isPosting: commentViewModel.isPosting,
+                canSend: commentViewModel.canPost,
+                accentColor: accentColor,
+                replyTargetName: replyTargetName,
+                focused: $isCommentInputFocused,
+                onClearReply: {
+                    replyTargetName = nil
+                    commentViewModel.draftCommentText = ""
+                },
+                onSend: {
+                    HapticFeedback.tap(.medium)
+                    commentViewModel.postComment()
+                    replyTargetName = nil
+                },
+                onLoginTap: {
+                    HapticFeedback.tap(.light)
+                    showLoginSheet = true
                 }
-            }
-            .padding(.horizontal, 14)
-            .padding(.top, 10)
-            .padding(.bottom, 10)
-            .background(.ultraThinMaterial)
+            )
+            .tabBarOverlayBottomPadding(extra: 6)
         }
         .onAppear {
             commentViewModel.startListening(communityId: community.id, postId: post.id)
@@ -1122,6 +1662,182 @@ struct CommunityPostDetailView: View {
         }
     }
 
+    private var commentsSectionHeader: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "bubble.left.and.bubble.right.fill")
+                .font(.subheadline.weight(.bold))
+                .foregroundStyle(accentColor)
+
+            Text("Comments")
+                .font(.headline.weight(.bold))
+                .foregroundStyle(AppTheme.titleText)
+
+            Spacer()
+
+            Text("\(commentViewModel.comments.count)")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(accentColor)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 5)
+                .background(accentColor.opacity(0.12))
+                .clipShape(Capsule())
+        }
+        .padding(.top, 2)
+        .padding(.bottom, 2)
+    }
+
+    private var detailBackground: some View {
+        ZStack {
+            backgroundColor
+
+            LinearGradient(
+                colors: [backgroundColor, Color.black.opacity(0.08)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+
+            Circle()
+                .fill(accentColor.opacity(0.16))
+                .frame(width: 220, height: 220)
+                .blur(radius: 38)
+                .offset(x: 145, y: -180)
+
+            Circle()
+                .fill(accentColor.opacity(0.1))
+                .frame(width: 180, height: 180)
+                .blur(radius: 32)
+                .offset(x: -140, y: 260)
+        }
+    }
+
+    private var backgroundColor: Color {
+        UIColor(named: "Background") == nil ? AppTheme.background : Color("Background")
+    }
+
+    private var cardColor: Color {
+        UIColor(named: "Card") == nil ? AppTheme.cardBackground : Color("Card")
+    }
+
+    private var accentColor: Color {
+        UIColor(named: "Accent") == nil ? AppTheme.accentPrimary : Color("Accent")
+    }
+
+    private func reply(to comment: CommunityComment) {
+        guard authViewModel.isLoggedIn else {
+            showLoginSheet = true
+            return
+        }
+
+        let firstName = comment.authorName
+            .split(separator: " ")
+            .first
+            .map(String.init) ?? comment.authorName
+
+        HapticFeedback.tap(.light)
+        replyTargetName = firstName
+        commentViewModel.draftCommentText = "@\(firstName) "
+        isCommentInputFocused = true
+    }
+
+    private func delete(_ comment: CommunityComment) {
+        guard authViewModel.isLoggedIn else {
+            showLoginSheet = true
+            return
+        }
+
+        HapticFeedback.tap(.medium)
+        commentViewModel.deleteComment(comment)
+    }
+}
+
+private struct PostHeaderView: View {
+    let post: CommunityPost
+    let accentColor: Color
+    let cardColor: Color
+
+    @State private var didAppear = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(post.title)
+                .font(.title2.weight(.bold))
+                .foregroundStyle(AppTheme.titleText)
+
+            HStack(spacing: 8) {
+                metadataPill(icon: "person.fill", text: "u/\(post.authorName)")
+                metadataPill(icon: "clock", text: relativeTimeString(for: post.createdAt))
+                metadataPill(icon: "arrow.up", text: "\(post.likeCount)")
+            }
+
+            Text(post.description)
+                .font(.subheadline)
+                .foregroundStyle(AppTheme.subtitleText)
+                .lineLimit(4)
+                .lineSpacing(4)
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(headerBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 20, style: .continuous))
+        .shadow(color: Color.black.opacity(0.16), radius: 14, x: 0, y: 8)
+        .shadow(color: accentColor.opacity(0.16), radius: 12, x: 0, y: 0)
+        .opacity(didAppear ? 1 : 0)
+        .offset(y: didAppear ? 0 : 10)
+        .animation(.easeOut(duration: 0.34), value: didAppear)
+        .onAppear {
+            if !didAppear {
+                didAppear = true
+            }
+        }
+    }
+
+    private var headerBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(cardColor.opacity(0.36))
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(.ultraThinMaterial)
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.black.opacity(0.24), Color.black.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            RoundedRectangle(cornerRadius: 20, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [accentColor.opacity(0.16), Color.clear],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .blur(radius: 12)
+                .padding(8)
+        }
+    }
+
+    private func metadataPill(icon: String, text: String) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+            Text(text)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(AppTheme.subtitleText)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 5)
+        .background(AppTheme.cardBackground.opacity(0.42))
+        .clipShape(Capsule())
+    }
+
     private func relativeTimeString(for date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
@@ -1129,35 +1845,276 @@ struct CommunityPostDetailView: View {
     }
 }
 
-private struct CommunityCommentRowView: View {
+private struct CommentCardView: View {
     let comment: CommunityComment
+    let accentColor: Color
+    let cardColor: Color
+    let canDelete: Bool
+    let isDeleting: Bool
+    let appearDelay: Double
+    let onReply: () -> Void
+    let onDelete: () -> Void
+
+    @State private var didAppear = false
+    @State private var isHighlighted = false
+    @State private var showActions = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Text(comment.authorName)
-                    .font(.subheadline.weight(.semibold))
+        HStack(alignment: .top, spacing: 12) {
+            avatar
 
-                Text(relativeTimeString(for: comment.createdAt))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 8) {
+                    Text(comment.authorName)
+                        .font(.subheadline.weight(.bold))
+                        .foregroundStyle(AppTheme.titleText)
+
+                    Text(relativeTimeString(for: comment.createdAt))
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.subtitleText)
+
+                    Spacer()
+                }
+
+                Text(comment.text)
+                    .font(.body)
+                    .foregroundStyle(AppTheme.subtitleText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(cardBackground)
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .stroke(Color.white.opacity(0.1), lineWidth: 1)
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(accentColor.opacity(isHighlighted ? 0.12 : 0))
+        }
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: Color.black.opacity(0.12), radius: 10, x: 0, y: 7)
+        .shadow(color: accentColor.opacity(0.12), radius: 9, x: 0, y: 0)
+        .opacity(isDeleting ? 0.5 : (didAppear ? 1 : 0))
+        .offset(y: didAppear ? 0 : 10)
+        .scaleEffect(isHighlighted ? 0.985 : 1)
+        .animation(.easeOut(duration: 0.3).delay(appearDelay), value: didAppear)
+        .animation(.spring(response: 0.26, dampingFraction: 0.74), value: isHighlighted)
+        .contentShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .onTapGesture {
+            HapticFeedback.tap(.light)
+            isHighlighted = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+                isHighlighted = false
+            }
+        }
+        .onLongPressGesture(minimumDuration: 0.35) {
+            HapticFeedback.tap(.medium)
+            showActions = true
+        }
+        .confirmationDialog("Comment actions", isPresented: $showActions, titleVisibility: .visible) {
+            Button("Reply") {
+                onReply()
             }
 
-            Text(comment.text)
-                .font(.body)
-                .foregroundColor(.primary)
-                .fixedSize(horizontal: false, vertical: true)
+            if canDelete {
+                Button("Delete", role: .destructive) {
+                    onDelete()
+                }
+            }
+
+            Button("Cancel", role: .cancel) { }
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(12)
+        .onAppear {
+            if !didAppear {
+                didAppear = true
+            }
+        }
+    }
+
+    private var avatar: some View {
+        ZStack {
+            Circle()
+                .fill(.ultraThinMaterial)
+
+            Circle()
+                .fill(
+                    LinearGradient(
+                        colors: [accentColor.opacity(0.34), accentColor.opacity(0.12)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            Circle()
+                .stroke(Color.white.opacity(0.16), lineWidth: 0.9)
+
+            Text(initials)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(AppTheme.titleText)
+        }
+        .frame(width: 36, height: 36)
+        .shadow(color: accentColor.opacity(0.2), radius: 8, x: 0, y: 0)
+    }
+
+    private var initials: String {
+        let parts = comment.authorName
+            .split(separator: " ")
+            .prefix(2)
+            .map { String($0.prefix(1)).uppercased() }
+
+        if parts.isEmpty {
+            return "U"
+        }
+        return parts.joined()
+    }
+
+    private var cardBackground: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(cardColor.opacity(0.33))
+
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThinMaterial)
+        }
     }
 
     private func relativeTimeString(for date: Date) -> String {
         let formatter = RelativeDateTimeFormatter()
         formatter.unitsStyle = .short
         return formatter.localizedString(for: date, relativeTo: Date())
+    }
+}
+
+private struct CommentInputBar: View {
+    let isLoggedIn: Bool
+    @Binding var draftText: String
+    let isPosting: Bool
+    let canSend: Bool
+    let accentColor: Color
+    let replyTargetName: String?
+    var focused: FocusState<Bool>.Binding
+    let onClearReply: () -> Void
+    let onSend: () -> Void
+    let onLoginTap: () -> Void
+
+    var body: some View {
+        VStack(spacing: 8) {
+            if isLoggedIn, let replyTargetName {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrowshape.turn.up.left.fill")
+                        .font(.caption)
+                        .foregroundStyle(accentColor)
+
+                    Text("Replying to u/\(replyTargetName)")
+                        .font(.caption)
+                        .foregroundStyle(AppTheme.subtitleText)
+
+                    Spacer()
+
+                    Button {
+                        onClearReply()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.subtitleText)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 4)
+            }
+
+            if isLoggedIn {
+                HStack(spacing: 10) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "text.bubble")
+                            .foregroundStyle(AppTheme.subtitleText)
+
+                        TextField("Write a comment...", text: $draftText)
+                            .focused(focused)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .stroke(Color.white.opacity(0.12), lineWidth: 1)
+                    )
+                    .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+                    Button(action: onSend) {
+                        Group {
+                            if isPosting {
+                                ProgressView()
+                                    .progressViewStyle(.circular)
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.subheadline.weight(.bold))
+                            }
+                        }
+                        .foregroundColor(.white)
+                        .frame(width: 42, height: 42)
+                        .background(canSend ? AppTheme.accentGradient : LinearGradient(colors: [Color.gray, Color.gray.opacity(0.8)], startPoint: .top, endPoint: .bottom))
+                        .clipShape(Circle())
+                        .shadow(color: canSend ? accentColor.opacity(0.32) : .clear, radius: 10, x: 0, y: 0)
+                    }
+                    .buttonStyle(SpringyButtonStyle())
+                    .disabled(!canSend)
+                }
+            } else {
+                Button(action: onLoginTap) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                        Text("Login to comment")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 11)
+                    .foregroundColor(.white)
+                    .background(AppTheme.accentGradient)
+                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                }
+                .buttonStyle(SpringyButtonStyle())
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 10)
+        .background(.ultraThinMaterial)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.white.opacity(0.12))
+                .frame(height: 1)
+        }
+    }
+}
+
+private struct CommentCardSkeletonView: View {
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Circle()
+                .fill(AppTheme.cardBackground.opacity(0.55))
+                .frame(width: 36, height: 36)
+
+            VStack(alignment: .leading, spacing: 8) {
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(AppTheme.cardBackground.opacity(0.56))
+                    .frame(width: 130, height: 14)
+
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(AppTheme.cardBackground.opacity(0.44))
+                    .frame(height: 14)
+
+                RoundedRectangle(cornerRadius: 7, style: .continuous)
+                    .fill(AppTheme.cardBackground.opacity(0.4))
+                    .frame(height: 14)
+            }
+        }
+        .padding(14)
+        .glassCard(cornerRadius: 18)
+        .shimmering()
     }
 }
 
@@ -1166,24 +2123,19 @@ struct FriendsHubWrapperView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @StateObject private var friendsViewModel = FriendsViewModel()
     @State private var showLoginSheet = false
+    var useNavigationContainer: Bool = true
 
     var body: some View {
-        NavigationView {
-            if authViewModel.isLoggedIn {
-                FriendsHubView(viewModel: friendsViewModel)
-                    .navigationTitle("Friends")
-            } else {
-                LoginRequiredView(
-                    title: "Connect With Readers",
-                    message: "Sign in to discover people with matching interests, shared activity, and mutual connections."
-                ) {
-                    showLoginSheet = true
+        Group {
+            if useNavigationContainer {
+                NavigationView {
+                    content
                 }
-                .padding(.horizontal, 20)
-                .navigationTitle("Friends")
+                .navigationViewStyle(StackNavigationViewStyle())
+            } else {
+                content
             }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
         .sheet(isPresented: $showLoginSheet) {
             LoginView(showGuestDismiss: true)
                 .environmentObject(authViewModel)
@@ -1201,6 +2153,23 @@ struct FriendsHubWrapperView: View {
             } else {
                 friendsViewModel.stopListening()
             }
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if authViewModel.isLoggedIn {
+            FriendsHubView(viewModel: friendsViewModel)
+                .navigationTitle("Friends")
+        } else {
+            LoginRequiredView(
+                title: "Connect With Readers",
+                message: "Sign in to discover people with matching interests, shared activity, and mutual connections."
+            ) {
+                showLoginSheet = true
+            }
+            .padding(.horizontal, 20)
+            .navigationTitle("Friends")
         }
     }
 }
@@ -1264,6 +2233,7 @@ struct FriendsHubView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 14)
+            .tabBarOverlayBottomPadding()
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
         .onAppear {
@@ -1559,8 +2529,23 @@ struct SocialFriendProfileView: View {
                                 viewModel.sendFriendRequest(to: user)
                             }
                         }
+
+                        if viewModel.canMessage(user: user),
+                           let chatPreview = chatPreview(for: user) {
+                            NavigationLink(destination: MessageConversationView(chat: chatPreview)) {
+                                Label("Message", systemImage: "paperplane.fill")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 10)
+                                    .background(Color.blue)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                     .padding(16)
+                    .tabBarOverlayBottomPadding()
                 }
             } else {
                 ProgressView("Loading profile...")
@@ -1572,6 +2557,24 @@ struct SocialFriendProfileView: View {
             viewModel.prefetchUserDetails(for: userId)
         }
         .background(Color(.systemGroupedBackground).ignoresSafeArea())
+    }
+
+    private func chatPreview(for user: AppUser) -> DirectChatPreview? {
+        guard let currentUserId = Auth.auth().currentUser?.uid,
+              currentUserId != user.id else {
+            return nil
+        }
+
+        return DirectChatPreview(
+            id: DirectMessageRepository.makeChatId(userA: currentUserId, userB: user.id),
+            participants: [currentUserId, user.id].sorted(),
+            otherUserId: user.id,
+            otherUserName: user.name,
+            otherUserPhotoURL: user.profileImageURL,
+            lastMessage: "Start chatting",
+            lastTimestamp: nil,
+            unreadCount: 0
+        )
     }
 }
 

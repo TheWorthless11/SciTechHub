@@ -3,55 +3,41 @@ import SwiftUI
 struct NewsView: View {
     @StateObject private var viewModel = NewsViewModel()
     @EnvironmentObject var authViewModel: AuthViewModel
+    @EnvironmentObject var bookmarkManager: BookmarkManager
     @State private var showLoginPrompt = false
     @State private var showLoginSheet = false
     
     var body: some View {
-        Group {
-            if viewModel.isLoading {
-                // Show a simple loading indicator
-                ProgressView("Loading...")
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
+
+            if viewModel.isLoading && viewModel.scienceArticles.isEmpty && viewModel.techArticles.isEmpty {
+                loadingState
             } else {
-                List {
-                    // Science News Section
-                    Section(header: Text("Science News")) {
-                        ForEach(viewModel.scienceArticles, id: \.id) { article in
-                            NavigationLink(destination: NewsArticleDetailView(article: article)) {
-                                ArticleRow(
-                                    article: article,
-                                    isLoggedIn: authViewModel.isLoggedIn,
-                                    onRestrictedAction: {
-                                        showLoginPrompt = true
-                                    }
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 24) {
+                        articleSection(
+                            title: "Science Frontier",
+                            subtitle: "Breakthroughs, discoveries, and space updates.",
+                            articles: viewModel.scienceArticles
+                        )
+
+                        articleSection(
+                            title: "Tech Pulse",
+                            subtitle: "AI, products, and future-defining engineering.",
+                            articles: viewModel.techArticles
+                        )
                     }
-                    
-                    // Technology News Section
-                    Section(header: Text("Technology News")) {
-                        ForEach(viewModel.techArticles, id: \.id) { article in
-                            NavigationLink(destination: NewsArticleDetailView(article: article)) {
-                                ArticleRow(
-                                    article: article,
-                                    isLoggedIn: authViewModel.isLoggedIn,
-                                    onRestrictedAction: {
-                                        showLoginPrompt = true
-                                    }
-                                )
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 14)
+                    .padding(.bottom, 28)
                 }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
         }
         .navigationTitle("Top News")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            // Fetch news when the screen appears
-            // We check if it's empty to prevent re-fetching every time you switch tabs or screens
             if viewModel.scienceArticles.isEmpty {
                 viewModel.fetchScienceNews()
             }
@@ -72,123 +58,113 @@ struct NewsView: View {
                 .environmentObject(authViewModel)
         }
     }
-}
 
-// Extracted into a small subview to keep code clean and simple
-struct ArticleRow: View {
-    let article: Article
-    let isLoggedIn: Bool
-    let onRestrictedAction: () -> Void
-    @EnvironmentObject var bookmarkManager: BookmarkManager
-    
-    var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Article Image
-            if let imageString = article.urlToImage, let imageUrl = URL(string: imageString) {
-                AsyncImage(url: imageUrl) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 80, height: 80)
-                            .cornerRadius(8)
-                            .clipped()
-                    } else if phase.error != nil {
-                        Image(systemName: "photo")
-                            .foregroundColor(.gray)
-                            .frame(width: 80, height: 80)
-                            .background(Color.gray.opacity(0.2))
-                            .cornerRadius(8)
-                    } else {
-                        ProgressView()
-                            .frame(width: 80, height: 80)
-                    }
+    private var loadingState: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 18) {
+                ForEach(0..<4, id: \.self) { _ in
+                    ArticleCardSkeletonView()
                 }
             }
-            
-            VStack(alignment: .leading, spacing: 6) {
-                // Article Title
-                Text(article.title)
-                    .font(.headline)
-                
-                // Article Description (Since it's optional, we safely unwrap it)
-                if let description = article.description {
-                    Text(description)
-                        .font(.subheadline)
-                        .foregroundColor(.gray)
-                        .lineLimit(3) // Keeps the cards from getting too long
-                }
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+            .padding(.bottom, 26)
+        }
+    }
+
+    private func articleSection(title: String, subtitle: String, articles: [Article]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(AppTheme.titleText)
+
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(AppTheme.subtitleText)
             }
-            
-            Spacer()
 
-            VStack(spacing: 8) {
-                Button(action: {
-                    if isLoggedIn {
-                        bookmarkManager.toggleArticleLove(article: article)
-                    } else {
-                        onRestrictedAction()
+            ForEach(articles, id: \.id) { article in
+                ZStack(alignment: .topTrailing) {
+                    NavigationLink(destination: NewsArticleDetailView(article: article)) {
+                        ArticleCardView(article: article)
                     }
-                }) {
-                    Image(systemName: loveIconName)
-                        .foregroundColor(loveIconColor)
-                        .padding(8)
-                }
-                .buttonStyle(BorderlessButtonStyle())
+                    .buttonStyle(.plain)
 
-                Button(action: {
-                    if isLoggedIn {
-                        bookmarkManager.toggleArticleBookmark(article: article)
-                    } else {
-                        onRestrictedAction()
-                    }
-                }) {
-                    Image(systemName: bookmarkIconName)
-                        .foregroundColor(bookmarkIconColor)
-                        .padding(8)
+                    quickActionBar(for: article)
+                        .padding(.top, 16)
+                        .padding(.trailing, 16)
                 }
-                .buttonStyle(BorderlessButtonStyle())
+                .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .padding(.vertical, 4)
     }
 
-    private var loveIconName: String {
-        if isLoggedIn {
-            return bookmarkManager.isArticleLoved(article: article) ? "heart.fill" : "heart"
+    private func quickActionBar(for article: Article) -> some View {
+        VStack(spacing: 8) {
+            Button {
+                handleLoveTap(for: article)
+            } label: {
+                Image(systemName: bookmarkManager.isArticleLoved(article: article) ? "heart.fill" : "heart")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(bookmarkManager.isArticleLoved(article: article) ? .red : .white)
+                    .frame(width: 34, height: 34)
+                    .background(Color.black.opacity(0.38))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(SpringyButtonStyle())
+
+            Button {
+                handleBookmarkTap(for: article)
+            } label: {
+                Image(systemName: bookmarkManager.isArticleBookmarked(article: article) ? "bookmark.fill" : "bookmark")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(bookmarkManager.isArticleBookmarked(article: article) ? AppTheme.accentSecondary : .white)
+                    .frame(width: 34, height: 34)
+                    .background(Color.black.opacity(0.38))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(SpringyButtonStyle())
         }
-        return "heart"
     }
 
-    private var loveIconColor: Color {
-        if isLoggedIn {
-            return bookmarkManager.isArticleLoved(article: article) ? .red : .gray
+    private func handleLoveTap(for article: Article) {
+        guard authViewModel.isLoggedIn else {
+            showLoginPrompt = true
+            return
         }
-        return .gray
+
+        HapticFeedback.tap(.light)
+        bookmarkManager.toggleArticleLove(article: article)
     }
-    
-    private var bookmarkIconName: String {
-        if isLoggedIn {
-            return bookmarkManager.isArticleBookmarked(article: article) ? "bookmark.fill" : "bookmark"
+
+    private func handleBookmarkTap(for article: Article) {
+        guard authViewModel.isLoggedIn else {
+            showLoginPrompt = true
+            return
         }
-        return "bookmark"
-    }
-    
-    private var bookmarkIconColor: Color {
-        if isLoggedIn {
-            return bookmarkManager.isArticleBookmarked(article: article) ? .blue : .gray
-        }
-        return .gray
+
+        HapticFeedback.tap(.light)
+        bookmarkManager.toggleArticleBookmark(article: article)
     }
 }
 
 struct NewsArticleDetailView: View {
     let article: Article
 
+    private enum ArticleTextOutputMode: String, CaseIterable, Identifiable {
+        case summary = "Summary"
+        case simplified = "Simplified"
+
+        var id: String {
+            rawValue
+        }
+    }
+
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var bookmarkManager: BookmarkManager
     @EnvironmentObject var userActivityViewModel: UserActivityViewModel
-    @StateObject private var summaryViewModel = ArticleSummaryViewModel()
+    @StateObject private var articleViewModel = ArticleViewModel()
     @StateObject private var notesViewModel = ArticleNotesViewModel()
     @StateObject private var commentViewModel = ArticleCommentViewModel()
 
@@ -197,87 +173,65 @@ struct NewsArticleDetailView: View {
     @State private var showShareSheet = false
     @State private var showInteractionToast = false
     @State private var interactionToastMessage = "Saved"
+    @State private var selectedTextOutputMode: ArticleTextOutputMode = .summary
+    @State private var didAppear = false
     @FocusState private var isCommentInputFocused: Bool
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                if let imageString = article.urlToImage,
-                   let imageURL = URL(string: imageString) {
-                    AsyncImage(url: imageURL) { phase in
-                        if let image = phase.image {
-                            image
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 220)
-                                .clipped()
-                                .cornerRadius(12)
-                        } else if phase.error != nil {
-                            Image(systemName: "photo")
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 220)
-                                .background(Color.gray.opacity(0.2))
-                                .cornerRadius(12)
-                        } else {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 220)
+                DetailHeaderView(article: article)
+                    .padding(.horizontal, 16)
+                    .padding(.top, 12)
+
+                VStack(alignment: .leading, spacing: 14) {
+                    if let description = article.description, !description.isEmpty {
+                        Text(description)
+                            .font(.body)
+                            .foregroundStyle(AppTheme.subtitleText)
+                    } else {
+                        Text("No description available for this article.")
+                            .font(.body)
+                            .foregroundStyle(AppTheme.subtitleText)
+                    }
+
+                    detailActionRow
+
+                    if let urlString = article.url,
+                       let url = URL(string: urlString) {
+                        Link(destination: url) {
+                            HStack(spacing: 8) {
+                                Image(systemName: "arrow.up.right.circle.fill")
+                                Text("Read Full Article")
+                            }
+                            .font(.subheadline.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .foregroundColor(.white)
+                            .background(AppTheme.accentGradient)
+                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
                         }
                     }
+
+                    summaryFeatureSection
+                    notesFeatureSection
+                    commentsFeatureSection
                 }
-
-                Text(article.title)
-                    .font(.title2)
-                    .fontWeight(.bold)
-
-                if let description = article.description, !description.isEmpty {
-                    Text(description)
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                } else {
-                    Text("No description available for this article.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                }
-
-                if let urlString = article.url,
-                   let url = URL(string: urlString) {
-                    Link(destination: url) {
-                        Text("Read Full Article")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .foregroundColor(.white)
-                            .cornerRadius(10)
-                    }
-                    .padding(.top, 8)
-                }
-
-                summaryFeatureSection
-                notesFeatureSection
-                commentsFeatureSection
+                .padding(.horizontal, 16)
+                .padding(.bottom, 22)
             }
-            .padding()
+            .opacity(didAppear ? 1 : 0)
+            .offset(y: didAppear ? 0 : 14)
+            .animation(.easeOut(duration: 0.34), value: didAppear)
         }
+        .background(AppTheme.background.ignoresSafeArea())
         .navigationTitle("Article")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .navigationBarTrailing) {
                 Button(action: handleShareTap) {
                     Image(systemName: "paperplane")
-                        .foregroundColor(.blue)
-                }
-
-                Button(action: handleLoveTap) {
-                    Image(systemName: loveIconName)
-                        .foregroundColor(loveIconColor)
-                }
-
-                Button(action: handleBookmarkTap) {
-                    Image(systemName: bookmarkIconName)
-                        .foregroundColor(bookmarkIconColor)
+                        .foregroundStyle(AppTheme.accentPrimary)
                 }
             }
         }
@@ -322,6 +276,7 @@ struct NewsArticleDetailView: View {
             commentInputBar
         }
         .onAppear {
+            didAppear = true
             userActivityViewModel.trackArticleRead(article: article)
             notesViewModel.configure(for: article, currentUser: authViewModel.user)
             commentViewModel.startListening(for: article)
@@ -357,9 +312,60 @@ struct NewsArticleDetailView: View {
 
     private var bookmarkIconColor: Color {
         if authViewModel.isLoggedIn {
-            return bookmarkManager.isArticleBookmarked(article: article) ? .blue : .gray
+            return bookmarkManager.isArticleBookmarked(article: article) ? AppTheme.accentPrimary : .gray
         }
         return .gray
+    }
+
+    private var detailActionRow: some View {
+        HStack(spacing: 10) {
+            detailActionButton(
+                title: "Like",
+                icon: loveIconName,
+                foreground: loveIconColor
+            ) {
+                handleLoveTap()
+            }
+
+            detailActionButton(
+                title: "Save",
+                icon: bookmarkIconName,
+                foreground: bookmarkIconColor
+            ) {
+                handleBookmarkTap()
+            }
+
+            detailActionButton(
+                title: "Summarize",
+                icon: "wand.and.stars",
+                foreground: AppTheme.accentPrimary
+            ) {
+                selectedTextOutputMode = .summary
+                articleViewModel.generateSummary(for: article)
+            }
+        }
+    }
+
+    private func detailActionButton(
+        title: String,
+        icon: String,
+        foreground: Color,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity)
+            .background(foreground.opacity(0.12))
+            .clipShape(RoundedRectangle(cornerRadius: 11, style: .continuous))
+        }
+        .buttonStyle(SpringyButtonStyle())
     }
 
     private func handleLoveTap() {
@@ -368,6 +374,7 @@ struct NewsArticleDetailView: View {
             return
         }
 
+        HapticFeedback.tap(.light)
         let wasLoved = bookmarkManager.isArticleLoved(article: article)
         bookmarkManager.toggleArticleLove(article: article)
         showToast(message: wasLoved ? "Love removed" : "Loved!")
@@ -379,6 +386,7 @@ struct NewsArticleDetailView: View {
             return
         }
 
+        HapticFeedback.tap(.light)
         let wasBookmarked = bookmarkManager.isArticleBookmarked(article: article)
         bookmarkManager.toggleArticleBookmark(article: article)
         showToast(message: wasBookmarked ? "Bookmark removed" : "Bookmarked!")
@@ -440,67 +448,100 @@ struct NewsArticleDetailView: View {
     }
 
     private var summaryFeatureSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Button(action: {
-                summaryViewModel.onSummaryButtonTap(for: article)
-            }) {
-                HStack(spacing: 8) {
-                    if summaryViewModel.isLoading {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                            .scaleEffect(0.8)
+        let hasSummary = !articleViewModel.summaryText.isEmpty
+        let hasSimplified = !articleViewModel.simplifiedText.isEmpty
+
+        return VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 10) {
+                Button(action: {
+                    selectedTextOutputMode = .summary
+                    articleViewModel.generateSummary(for: article)
+                }) {
+                    HStack(spacing: 8) {
+                        if articleViewModel.isSummarizing {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        }
+
+                        Text("Summarize")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Spacer(minLength: 0)
+                        Image(systemName: "sparkles")
                     }
-
-                    Text(summaryViewModel.buttonTitle)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-
-                    Spacer()
-
-                    Image(systemName: summaryViewModel.isSummaryVisible ? "sparkles.rectangle.stack.fill" : "sparkles")
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .foregroundColor(.white)
+                    .background(articleViewModel.isProcessing ? Color.gray : AppTheme.accentSecondary)
+                    .cornerRadius(12)
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .foregroundColor(.white)
-                .background(summaryViewModel.isLoading ? Color.gray : Color.indigo)
-                .cornerRadius(12)
-            }
-            .disabled(summaryViewModel.isLoading)
+                .disabled(articleViewModel.isProcessing)
 
-            if summaryViewModel.isLoading {
+                Button(action: {
+                    selectedTextOutputMode = .simplified
+                    articleViewModel.generateSimplifiedText(for: article)
+                }) {
+                    HStack(spacing: 8) {
+                        if articleViewModel.isSimplifying {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                .scaleEffect(0.8)
+                        }
+
+                        Text("Simplify Content")
+                            .font(.subheadline)
+                            .fontWeight(.semibold)
+
+                        Spacer(minLength: 0)
+                        Image(systemName: "wand.and.stars")
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .foregroundColor(.white)
+                    .background(articleViewModel.isProcessing ? Color.gray : AppTheme.accentPrimary)
+                    .cornerRadius(12)
+                }
+                .disabled(articleViewModel.isProcessing)
+            }
+
+            if articleViewModel.isProcessing {
                 HStack(spacing: 8) {
                     ProgressView()
-                    Text("Generating summary...")
+                    Text("Processing article text...")
                         .font(.footnote)
                         .foregroundColor(.secondary)
                 }
             }
 
-            if let errorMessage = summaryViewModel.errorMessage {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(errorMessage)
-                        .font(.footnote)
-                        .foregroundColor(.red)
-
-                    Button("Retry") {
-                        summaryViewModel.retry(for: article)
-                    }
-                    .font(.footnote.weight(.semibold))
-                }
+            if let errorMessage = articleViewModel.processingError {
+                Text(errorMessage)
+                    .font(.footnote)
+                    .foregroundColor(.red)
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.red.opacity(0.1))
                 .cornerRadius(12)
             }
 
-            if summaryViewModel.isSummaryVisible,
-               let summaryText = summaryViewModel.summaryText {
+            if hasSummary && hasSimplified {
+                Picker("Result", selection: $selectedTextOutputMode) {
+                    ForEach(ArticleTextOutputMode.allCases) { mode in
+                        Text(mode.rawValue).tag(mode)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            if hasSummary,
+               selectedTextOutputMode == .summary || !hasSimplified {
                 VStack(alignment: .leading, spacing: 10) {
                     Label("AI Summary", systemImage: "sparkles")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.indigo)
+                        .foregroundColor(AppTheme.accentSecondary)
 
-                    Text(summaryText)
+                    Text(articleViewModel.summaryText)
                         .font(.body)
                         .foregroundColor(.primary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -509,16 +550,43 @@ struct NewsArticleDetailView: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(Color.indigo.opacity(0.1))
+                        .fill(AppTheme.accentSecondary.opacity(0.13))
                 )
                 .overlay(
                     RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .stroke(Color.indigo.opacity(0.22), lineWidth: 1)
+                        .stroke(AppTheme.accentSecondary.opacity(0.28), lineWidth: 1)
+                )
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+
+            if hasSimplified,
+               selectedTextOutputMode == .simplified || !hasSummary {
+                VStack(alignment: .leading, spacing: 10) {
+                    Label("Simplified Content", systemImage: "wand.and.stars")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(AppTheme.accentPrimary)
+
+                    Text(articleViewModel.simplifiedText)
+                        .font(.body)
+                        .foregroundColor(.primary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(14)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(AppTheme.accentPrimary.opacity(0.13))
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(AppTheme.accentPrimary.opacity(0.28), lineWidth: 1)
                 )
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.25), value: summaryViewModel.isSummaryVisible)
+        .animation(.easeInOut(duration: 0.25), value: articleViewModel.summaryText)
+        .animation(.easeInOut(duration: 0.25), value: articleViewModel.simplifiedText)
+        .animation(.easeInOut(duration: 0.2), value: selectedTextOutputMode)
     }
 
     private var notesFeatureSection: some View {
@@ -541,7 +609,7 @@ struct NewsArticleDetailView: View {
                         TextEditor(text: $notesViewModel.noteText)
                             .frame(minHeight: 130)
                             .padding(6)
-                            .background(Color(.secondarySystemBackground))
+                            .background(AppTheme.cardBackground.opacity(0.72))
                             .cornerRadius(12)
 
                         if notesViewModel.noteText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -562,7 +630,7 @@ struct NewsArticleDetailView: View {
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .foregroundColor(.white)
-                        .background(notesViewModel.isSaving ? Color.gray : Color.indigo)
+                        .background(notesViewModel.isSaving ? Color.gray : AppTheme.accentSecondary)
                         .cornerRadius(10)
                         .disabled(notesViewModel.isSaving)
 
@@ -595,7 +663,7 @@ struct NewsArticleDetailView: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground))
+                .background(AppTheme.cardBackground.opacity(0.82))
                 .cornerRadius(14)
             } else {
                 VStack(alignment: .leading, spacing: 8) {
@@ -611,13 +679,13 @@ struct NewsArticleDetailView: View {
                             .padding(.horizontal, 14)
                             .padding(.vertical, 9)
                             .foregroundColor(.white)
-                            .background(Color.indigo)
+                            .background(AppTheme.accentPrimary)
                             .cornerRadius(10)
                     }
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground))
+                .background(AppTheme.cardBackground.opacity(0.82))
                 .cornerRadius(14)
             }
         }
@@ -650,7 +718,7 @@ struct NewsArticleDetailView: View {
                 }
                 .padding(12)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color(.secondarySystemBackground))
+                .background(AppTheme.cardBackground.opacity(0.82))
                 .cornerRadius(12)
             } else if commentViewModel.threadedComments.isEmpty {
                 Text("No comments yet. Start the discussion.")
@@ -658,7 +726,7 @@ struct NewsArticleDetailView: View {
                     .foregroundColor(.secondary)
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(.secondarySystemBackground))
+                    .background(AppTheme.cardBackground.opacity(0.82))
                     .cornerRadius(12)
             } else {
                 VStack(spacing: 10) {
@@ -717,7 +785,7 @@ struct NewsArticleDetailView: View {
             if let replyTarget = commentViewModel.replyingTo {
                 HStack(spacing: 8) {
                     Image(systemName: "arrowshape.turn.up.right.fill")
-                        .foregroundColor(.indigo)
+                        .foregroundColor(AppTheme.accentPrimary)
                     Text("Replying to \(replyTarget.authorName)")
                         .font(.footnote)
                         .foregroundColor(.secondary)
@@ -744,7 +812,7 @@ struct NewsArticleDetailView: View {
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
                     .foregroundColor(.white)
-                    .background(commentViewModel.canPost ? Color.indigo : Color.gray)
+                    .background(commentViewModel.canPost ? AppTheme.accentPrimary : Color.gray)
                     .cornerRadius(10)
                     .disabled(!commentViewModel.canPost)
                 }
@@ -760,7 +828,7 @@ struct NewsArticleDetailView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 10)
                     .foregroundColor(.white)
-                    .background(Color.indigo)
+                    .background(AppTheme.accentPrimary)
                     .cornerRadius(10)
                 }
             }

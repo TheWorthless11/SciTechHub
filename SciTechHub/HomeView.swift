@@ -13,7 +13,7 @@ import FirebaseFirestore
 // 1. Simple Category Model
 struct Category: Identifiable {
     let name: String
-    let emoji: String
+    let icon: String
 
     var id: String {
         name
@@ -266,13 +266,15 @@ struct HomeView: View {
     @State private var showLoginPrompt = false
     @State private var showLoginSheet = false
     @State private var loginPromptMessage = "Personalized topics and profile tools are available for logged-in users."
+    @State private var selectedTopicId: String?
+    @State private var activeTopicCategoryName: String?
     
     // Sample categories
     let categories = [
-        Category(name: "Science", emoji: "🔬"),
-        Category(name: "Artificial Intelligence", emoji: "🤖"),
-        Category(name: "Space", emoji: "🚀"),
-        Category(name: "Health", emoji: "🩺")
+        Category(name: "Science", icon: "atom"),
+        Category(name: "Artificial Intelligence", icon: "brain.head.profile"),
+        Category(name: "Space", icon: "sparkles"),
+        Category(name: "Health", icon: "cross.case.fill")
     ]
     
     // Grid layout configuration
@@ -338,12 +340,12 @@ struct HomeView: View {
                 Text("Explore Topics")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundStyle(AppTheme.titleText)
                     .padding(.horizontal)
                 
                 LazyVGrid(columns: columns, spacing: 16) {
-                    ForEach(categories) { category in
-                        categoryActionView(for: category)
-                            .buttonStyle(PlainButtonStyle())
+                    ForEach(Array(categories.enumerated()), id: \.element.id) { index, category in
+                        categoryActionView(for: category, index: index)
                     }
                 }
                 .padding(.horizontal)
@@ -353,7 +355,9 @@ struct HomeView: View {
                 recommendationsSection
             }
             .padding(.vertical)
+            .tabBarOverlayBottomPadding()
         }
+        .background(AppTheme.background.ignoresSafeArea())
     }
     
     @ViewBuilder
@@ -362,10 +366,10 @@ struct HomeView: View {
             Text("Login to access this feature")
                 .font(.subheadline)
                 .fontWeight(.semibold)
-                .foregroundColor(.orange)
+                .foregroundColor(AppTheme.accentPrimary)
                 .padding(10)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(Color.orange.opacity(0.12))
+                .background(AppTheme.accentPrimary.opacity(0.1))
                 .cornerRadius(10)
                 .padding(.horizontal)
         }
@@ -389,16 +393,52 @@ struct HomeView: View {
     }
     
     @ViewBuilder
-    private func categoryActionView(for category: Category) -> some View {
-        if authViewModel.isLoggedIn {
-            NavigationLink(destination: TopicListView(categoryName: category.name)) {
-                categoryCard(for: category, isLocked: false)
-            }
-        } else {
-            Button(action: {
+    private func categoryActionView(for category: Category, index: Int) -> some View {
+        let isSelected = selectedTopicId == category.id
+        let appearDelay = Double(index) * 0.055
+
+        Button {
+            handleTopicTap(category)
+
+            if authViewModel.isLoggedIn {
+                activeTopicCategoryName = category.name
+            } else {
                 presentLoginPrompt(message: "Personalized topics and profile tools are available for logged-in users.")
-            }) {
-                categoryCard(for: category, isLocked: true)
+            }
+        } label: {
+            TopicCardView(
+                title: category.name,
+                icon: category.icon,
+                isSelected: isSelected,
+                isLocked: !authViewModel.isLoggedIn,
+                appearDelay: appearDelay
+            )
+        }
+        .buttonStyle(TopicCardButtonStyle())
+        .background {
+            NavigationLink(
+                destination: TopicListView(categoryName: category.name),
+                tag: category.name,
+                selection: $activeTopicCategoryName
+            ) {
+                EmptyView()
+            }
+            .hidden()
+        }
+    }
+
+    private func handleTopicTap(_ category: Category) {
+        HapticFeedback.tap(.light)
+
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) {
+            selectedTopicId = category.id
+        }
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.9) {
+            withAnimation(.easeInOut(duration: 0.25)) {
+                if selectedTopicId == category.id {
+                    selectedTopicId = nil
+                }
             }
         }
     }
@@ -409,6 +449,7 @@ struct HomeView: View {
                 Text("🎯 Recommended for You")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundStyle(AppTheme.titleText)
 
                 Spacer()
 
@@ -455,6 +496,7 @@ struct HomeView: View {
                 Text("🔥 Trending Now")
                     .font(.title2)
                     .fontWeight(.bold)
+                    .foregroundStyle(AppTheme.titleText)
 
                 Spacer()
 
@@ -531,16 +573,15 @@ struct HomeView: View {
                 .font(.headline)
                 .lineLimit(2)
                 .multilineTextAlignment(.leading)
+                .foregroundStyle(AppTheme.titleText)
 
             Text(sourceName(for: article))
                 .font(.caption)
-                .foregroundColor(.secondary)
+                .foregroundColor(AppTheme.subtitleText)
         }
         .padding(12)
         .frame(width: 245, alignment: .leading)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(16)
-        .shadow(color: Color.black.opacity(0.08), radius: 4, x: 0, y: 2)
+        .glassCard(cornerRadius: 18)
     }
 
     private func sourceName(for article: Article) -> String {
@@ -584,11 +625,12 @@ struct HomeView: View {
             Text(article.title)
                 .font(.headline)
                 .lineLimit(2)
+                .foregroundStyle(AppTheme.titleText)
 
             if let description = article.description {
                 Text(description)
                     .font(.subheadline)
-                    .foregroundColor(.secondary)
+                    .foregroundColor(AppTheme.subtitleText)
                     .lineLimit(2)
             }
 
@@ -622,8 +664,7 @@ struct HomeView: View {
         }
         .padding()
         .frame(width: 260, alignment: .leading)
-        .background(Color.blue.opacity(0.08))
-        .cornerRadius(14)
+        .glassCard(cornerRadius: 18)
     }
 
     private func loveIconName(for article: Article) -> String {
@@ -649,7 +690,7 @@ struct HomeView: View {
 
     private func bookmarkIconColor(for article: Article) -> Color {
         if authViewModel.isLoggedIn {
-            return bookmarkManager.isArticleBookmarked(article: article) ? .blue : .gray
+            return bookmarkManager.isArticleBookmarked(article: article) ? AppTheme.accentPrimary : .gray
         }
         return .gray
     }
@@ -660,6 +701,7 @@ struct HomeView: View {
             return
         }
 
+        HapticFeedback.tap(.light)
         bookmarkManager.toggleArticleLove(article: article)
     }
 
@@ -669,6 +711,7 @@ struct HomeView: View {
             return
         }
 
+        HapticFeedback.tap(.light)
         bookmarkManager.toggleArticleBookmark(article: article)
     }
 
@@ -689,32 +732,6 @@ struct HomeView: View {
         refreshTrending()
         refreshRecommendations()
     }
-
-    private func categoryCard(for category: Category, isLocked: Bool) -> some View {
-        VStack(spacing: 12) {
-            Text(category.emoji)
-                .font(.system(size: 40))
-
-            Text(category.name)
-                .font(.headline)
-                .foregroundColor(.primary)
-                .multilineTextAlignment(.center)
-                .lineLimit(2)
-                .minimumScaleFactor(0.8)
-        }
-        .padding()
-        .frame(maxWidth: .infinity, minHeight: 120)
-        .background(Color.blue.opacity(0.1))
-        .cornerRadius(16)
-        .overlay(alignment: .topTrailing) {
-            if isLocked {
-                Image(systemName: "lock.fill")
-                    .foregroundColor(.orange)
-                    .padding(8)
-            }
-        }
-        .opacity(isLocked ? 0.85 : 1)
-    }
 }
 
 struct HomeView_Previews: PreviewProvider {
@@ -731,40 +748,14 @@ struct TrendingNowView: View {
 
     @EnvironmentObject var authViewModel: AuthViewModel
     @EnvironmentObject var bookmarkManager: BookmarkManager
+    @State private var showLoginPrompt = false
+    @State private var showLoginSheet = false
 
     var body: some View {
-        Group {
-            if recommendationViewModel.isLoading && visibleArticles.isEmpty {
-                ProgressView("Loading trending stories...")
-            } else if visibleArticles.isEmpty {
-                VStack(spacing: 10) {
-                    Image(systemName: "flame")
-                        .font(.system(size: 40))
-                        .foregroundColor(.orange)
+        ZStack {
+            AppTheme.background.ignoresSafeArea()
 
-                    Text("No trending stories yet")
-                        .font(.headline)
-
-                    Text("Try again shortly while we gather engagement data.")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
-                }
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 14) {
-                        ForEach(visibleArticles, id: \.id) { article in
-                            NavigationLink(destination: NewsArticleDetailView(article: article)) {
-                                trendingListCard(for: article)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                    }
-                    .padding(.horizontal)
-                    .padding(.vertical, 10)
-                }
-            }
+            content
         }
         .navigationTitle("Trending Now")
         .navigationBarTitleDisplayMode(.inline)
@@ -784,67 +775,135 @@ struct TrendingNowView: View {
         .onChange(of: recommendationViewModel.sourceArticles.map(\.id)) { _ in
             refreshTrending()
         }
+        .onChange(of: recommendationViewModel.userInterests) { _ in
+            refreshTrending()
+        }
+        .alert("Login to access this feature", isPresented: $showLoginPrompt) {
+            Button("Not Now", role: .cancel) { }
+            Button("Login") {
+                showLoginSheet = true
+            }
+        } message: {
+            Text("Login to react or save articles.")
+        }
+        .sheet(isPresented: $showLoginSheet) {
+            LoginView(showGuestDismiss: true)
+                .environmentObject(authViewModel)
+        }
     }
 
     private var visibleArticles: [Article] {
         Array(recommendationViewModel.trendingArticles.prefix(20))
     }
 
-    private func trendingListCard(for article: Article) -> some View {
-        HStack(alignment: .top, spacing: 12) {
-            if let imageString = article.urlToImage,
-               let imageUrl = URL(string: imageString) {
-                AsyncImage(url: imageUrl) { phase in
-                    if let image = phase.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 92, height: 92)
-                            .clipped()
-                    } else if phase.error != nil {
-                        Color.gray.opacity(0.2)
-                            .overlay(
-                                Image(systemName: "photo")
-                                    .foregroundColor(.gray)
-                            )
-                            .frame(width: 92, height: 92)
-                    } else {
-                        ProgressView()
-                            .frame(width: 92, height: 92)
+    @ViewBuilder
+    private var content: some View {
+        if recommendationViewModel.isLoading && visibleArticles.isEmpty {
+            ScrollView {
+                LazyVStack(spacing: 18) {
+                    ForEach(0..<4, id: \.self) { _ in
+                        ArticleCardSkeletonView()
                     }
                 }
-                .cornerRadius(10)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .tabBarOverlayBottomPadding()
             }
+        } else if visibleArticles.isEmpty {
+            VStack(spacing: 10) {
+                Image(systemName: "flame.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(AppTheme.accentPrimary)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Text(article.title)
+                Text("No trending stories yet")
                     .font(.headline)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
+                    .foregroundColor(AppTheme.titleText)
 
-                Text(sourceName(for: article))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                Text("Try again shortly while we gather engagement data.")
+                    .font(.subheadline)
+                    .foregroundColor(AppTheme.subtitleText)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal)
             }
-
-            Spacer(minLength: 0)
+            .padding(18)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .glassCard(cornerRadius: 22)
+            .padding(20)
+        } else {
+            ScrollView {
+                LazyVStack(spacing: 18) {
+                    ForEach(visibleArticles, id: \.id) { article in
+                        trendingFeedCard(for: article)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .tabBarOverlayBottomPadding()
+            }
+            .animation(.easeInOut(duration: 0.24), value: visibleArticles.map(\.id))
         }
-        .padding(12)
-        .background(Color(.secondarySystemBackground))
-        .cornerRadius(14)
-        .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 2)
     }
 
-    private func sourceName(for article: Article) -> String {
-        guard
-            let urlString = article.url,
-            let host = URL(string: urlString)?.host
-        else {
-            return "SciTechHub"
+    private func trendingFeedCard(for article: Article) -> some View {
+        ZStack(alignment: .topTrailing) {
+            NavigationLink(destination: NewsArticleDetailView(article: article)) {
+                ArticleCardView(article: article)
+            }
+            .buttonStyle(.plain)
+
+            quickActionBar(for: article)
+                .padding(.top, 16)
+                .padding(.trailing, 16)
+        }
+    }
+
+    private func quickActionBar(for article: Article) -> some View {
+        VStack(spacing: 8) {
+            Button {
+                handleLoveTap(for: article)
+            } label: {
+                Image(systemName: bookmarkManager.isArticleLoved(article: article) ? "heart.fill" : "heart")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(bookmarkManager.isArticleLoved(article: article) ? .red : .white)
+                    .frame(width: 34, height: 34)
+                    .background(Color.black.opacity(0.38))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(SpringyButtonStyle())
+
+            Button {
+                handleBookmarkTap(for: article)
+            } label: {
+                Image(systemName: bookmarkManager.isArticleBookmarked(article: article) ? "bookmark.fill" : "bookmark")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(bookmarkManager.isArticleBookmarked(article: article) ? AppTheme.accentSecondary : .white)
+                    .frame(width: 34, height: 34)
+                    .background(Color.black.opacity(0.38))
+                    .clipShape(Circle())
+            }
+            .buttonStyle(SpringyButtonStyle())
+        }
+    }
+
+    private func handleLoveTap(for article: Article) {
+        guard authViewModel.isLoggedIn else {
+            showLoginPrompt = true
+            return
         }
 
-        let cleanedHost = host.replacingOccurrences(of: "www.", with: "")
-        return cleanedHost.capitalized
+        HapticFeedback.tap(.light)
+        bookmarkManager.toggleArticleLove(article: article)
+    }
+
+    private func handleBookmarkTap(for article: Article) {
+        guard authViewModel.isLoggedIn else {
+            showLoginPrompt = true
+            return
+        }
+
+        HapticFeedback.tap(.light)
+        bookmarkManager.toggleArticleBookmark(article: article)
     }
 
     private func refreshTrending() {

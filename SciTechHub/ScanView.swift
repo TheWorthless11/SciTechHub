@@ -631,11 +631,19 @@ final class ScanViewModel: ObservableObject {
 }
 
 struct ScanWrapperView: View {
+    var useNavigationContainer: Bool = true
+
     var body: some View {
-        NavigationView {
-            ScanHomeView()
+        Group {
+            if useNavigationContainer {
+                NavigationView {
+                    ScanHomeView()
+                }
+                .navigationViewStyle(StackNavigationViewStyle())
+            } else {
+                ScanHomeView()
+            }
         }
-        .navigationViewStyle(StackNavigationViewStyle())
     }
 }
 
@@ -805,6 +813,7 @@ struct ScanPreviewView: View {
                 }
             }
             .padding(16)
+            .tabBarOverlayBottomPadding()
         }
         .navigationTitle("Preview")
         .navigationBarTitleDisplayMode(.inline)
@@ -891,6 +900,7 @@ struct ScanSummaryResultView: View {
                     .cornerRadius(12)
             }
             .padding(16)
+            .tabBarOverlayBottomPadding()
         }
         .navigationTitle("Summary")
         .navigationBarTitleDisplayMode(.inline)
@@ -925,6 +935,7 @@ struct ScanSimplifiedResultView: View {
                     .cornerRadius(12)
             }
             .padding(16)
+            .tabBarOverlayBottomPadding()
         }
         .navigationTitle("Simplified")
         .navigationBarTitleDisplayMode(.inline)

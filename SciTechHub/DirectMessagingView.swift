@@ -17,6 +17,7 @@ struct DirectChatPreview: Identifiable, Hashable {
     let otherUserPhotoURL: String
     let lastMessage: String
     let lastTimestamp: Date?
+    let unreadCount: Int
 }
 
 struct DirectMessageItem: Identifiable, Hashable {
@@ -72,6 +73,7 @@ enum DirectMessageRepository {
     ) {
         db.collection("chats")
             .whereField("participants", arrayContains: currentUserId)
+            .limit(to: 100)
             .getDocuments { snapshot, error in
                 if let error = error {
                     completion(.failure(error))
@@ -88,6 +90,7 @@ enum DirectMessageRepository {
                     let otherUserId = participants.first(where: { $0 != currentUserId }) ?? currentUserId
                     let participantNames = data["participantNames"] as? [String: String] ?? [:]
                     let participantPhotoURLs = data["participantPhotoURLs"] as? [String: String] ?? [:]
+                    let unreadCounts = data["unreadCounts"] as? [String: Any] ?? [:]
 
                     let rawOtherName = participantNames[otherUserId] ?? "User"
                     let otherName = rawOtherName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -96,6 +99,9 @@ enum DirectMessageRepository {
 
                     let lastMessageRaw = (data["lastMessage"] as? String) ?? ""
                     let lastMessage = lastMessageRaw.trimmingCharacters(in: .whitespacesAndNewlines)
+                    let unreadCount = (unreadCounts[currentUserId] as? NSNumber)?.intValue
+                        ?? (unreadCounts[currentUserId] as? Int)
+                        ?? 0
 
                     return DirectChatPreview(
                         id: document.documentID,
@@ -104,7 +110,8 @@ enum DirectMessageRepository {
                         otherUserName: otherName,
                         otherUserPhotoURL: participantPhotoURLs[otherUserId] ?? "",
                         lastMessage: lastMessage.isEmpty ? "Start chatting" : lastMessage,
-                        lastTimestamp: (data["lastTimestamp"] as? Timestamp)?.dateValue()
+                        lastTimestamp: (data["lastTimestamp"] as? Timestamp)?.dateValue(),
+                        unreadCount: unreadCount
                     )
                 }
 
@@ -125,6 +132,7 @@ enum DirectMessageRepository {
             .document(chatId)
             .collection("messages")
             .order(by: "timestamp", descending: false)
+            .limit(to: 300)
             .getDocuments { snapshot, error in
                 if let error = error {
                     completion(.failure(error))
@@ -244,6 +252,8 @@ enum DirectMessageRepository {
                 "participantPhotoURLs": participantPhotos,
                 "lastMessage": trimmedText,
                 "lastTimestamp": FieldValue.serverTimestamp(),
+                "unreadCounts.\(senderId)": 0,
+                "unreadCounts.\(receiver.id)": FieldValue.increment(Int64(1)),
                 "updatedAt": FieldValue.serverTimestamp()
             ], forDocument: chatRef, merge: true)
 
@@ -262,6 +272,25 @@ enum DirectMessageRepository {
                 }
             }
         }
+    }
+
+    static func markChatAsRead(
+        chatId: String,
+        using db: Firestore,
+        completion: ((Error?) -> Void)? = nil
+    ) {
+        guard let currentUserId = Auth.auth().currentUser?.uid else {
+            completion?(DirectMessageRepositoryError.notLoggedIn)
+            return
+        }
+
+        db.collection("chats")
+            .document(chatId)
+            .setData([
+                "unreadCounts.\(currentUserId)": 0
+            ], merge: true) { error in
+                completion?(error)
+            }
     }
 
     private static func resolveCurrentUserProfile(
@@ -415,9 +444,22 @@ final class MessageViewModel: ObservableObject {
                 switch result {
                 case let .success(messages):
                     self.messages = messages
+                    self.markChatAsRead()
                 case let .failure(error):
                     self.errorMessage = self.friendlyErrorMessage(for: error, action: "load messages")
                 }
+            }
+        }
+    }
+
+    func markChatAsRead() {
+        DirectMessageRepository.markChatAsRead(chatId: chat.id, using: db) { error in
+            guard let error = error else {
+                return
+            }
+
+            DispatchQueue.main.async {
+                self.errorMessage = self.friendlyErrorMessage(for: error, action: "mark chat as read")
             }
         }
     }
@@ -470,18 +512,23 @@ final class MessageViewModel: ObservableObject {
 struct InboxWrapperView: View {
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var showLoginSheet = false
+    var useNavigationContainer: Bool = true
 
     var body: some View {
         Group {
-            if #available(iOS 16.0, *) {
-                NavigationStack {
-                    content
+            if useNavigationContainer {
+                if #available(iOS 16.0, *) {
+                    NavigationStack {
+                        content
+                    }
+                } else {
+                    NavigationView {
+                        content
+                    }
+                    .navigationViewStyle(StackNavigationViewStyle())
                 }
             } else {
-                NavigationView {
-                    content
-                }
-                .navigationViewStyle(StackNavigationViewStyle())
+                content
             }
         }
         .sheet(isPresented: $showLoginSheet) {
@@ -509,6 +556,7 @@ struct InboxWrapperView: View {
 
 struct InboxView: View {
     @StateObject private var viewModel = ChatViewModel()
+    @State private var showNewMessageSheet = false
 
     var body: some View {
         Group {
@@ -523,11 +571,23 @@ struct InboxView: View {
                     }
                 }
                 .listStyle(.plain)
+                .refreshable {
+                    viewModel.loadChats()
+                }
             }
         }
         .navigationTitle("Inbox")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button {
+                    showNewMessageSheet = true
+                } label: {
+                    Label("New Message", systemImage: "square.and.pencil")
+                }
+                .accessibilityLabel("Start new message")
+            }
+
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button {
                     viewModel.loadChats()
@@ -547,6 +607,11 @@ struct InboxView: View {
                     .background(Color.red.opacity(0.12))
                     .clipShape(Capsule())
                     .padding(.top, 8)
+            }
+        }
+        .sheet(isPresented: $showNewMessageSheet) {
+            NewMessageSheet {
+                viewModel.loadChats()
             }
         }
         .onAppear {
@@ -599,10 +664,22 @@ private struct ChatInboxRow: View {
 
             Spacer(minLength: 8)
 
-            if let timestamp = chat.lastTimestamp {
-                Text(timestamp.formatted(date: .abbreviated, time: .shortened))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            VStack(alignment: .trailing, spacing: 6) {
+                if let timestamp = chat.lastTimestamp {
+                    Text(timestamp.formatted(date: .abbreviated, time: .shortened))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+
+                if chat.unreadCount > 0 {
+                    Text(chat.unreadCount > 99 ? "99+" : "\(chat.unreadCount)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 7)
+                        .padding(.vertical, 4)
+                        .background(Color.blue)
+                        .clipShape(Capsule())
+                }
             }
         }
         .padding(.vertical, 4)
@@ -666,7 +743,7 @@ struct MessageConversationView: View {
                         }
                         .padding(.horizontal, 12)
                         .padding(.top, 12)
-                        .padding(.bottom, 8)
+                        .tabBarOverlayBottomPadding(extra: 8)
                     }
                     .onAppear {
                         scrollToBottom(proxy: proxy, animated: false)
@@ -702,6 +779,7 @@ struct MessageConversationView: View {
         }
         .onAppear {
             viewModel.loadMessages()
+            viewModel.markChatAsRead()
         }
     }
 
@@ -730,6 +808,11 @@ struct MessageConversationView: View {
                 .padding(.vertical, 10)
                 .background(Color(.secondarySystemBackground))
                 .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .textInputAutocapitalization(.sentences)
+                .submitLabel(.send)
+                .onSubmit {
+                    viewModel.sendMessage()
+                }
 
             Button {
                 viewModel.sendMessage()
@@ -802,6 +885,187 @@ private struct MessageBubbleRow: View {
     }
 }
 
+struct NewMessageSheet: View {
+    let onMessageSent: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var viewModel = ChatViewModel()
+    @State private var selectedFriend: DirectMessageFriend?
+    @State private var draftMessage = ""
+
+    private var canSend: Bool {
+        selectedFriend != nil
+            && !draftMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !viewModel.isSending
+    }
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 0) {
+                if viewModel.isLoadingFriends && viewModel.friends.isEmpty {
+                    ProgressView("Loading friends...")
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else if viewModel.friends.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "person.2")
+                            .font(.system(size: 34, weight: .semibold))
+                            .foregroundColor(.secondary)
+
+                        Text("No friends found")
+                            .font(.headline)
+
+                        Text("Add friends to start a new conversation.")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 24)
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .padding()
+                } else {
+                    List(viewModel.friends) { friend in
+                        Button {
+                            selectedFriend = friend
+                        } label: {
+                            HStack(spacing: 12) {
+                                if let url = URL(string: friend.profileImageURL), !friend.profileImageURL.isEmpty {
+                                    AsyncImage(url: url) { phase in
+                                        if let image = phase.image {
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                        } else {
+                                            Image(systemName: "person.crop.circle.fill")
+                                                .resizable()
+                                                .scaledToFit()
+                                                .foregroundColor(.blue.opacity(0.85))
+                                        }
+                                    }
+                                    .frame(width: 36, height: 36)
+                                    .clipShape(Circle())
+                                } else {
+                                    Image(systemName: "person.crop.circle.fill")
+                                        .resizable()
+                                        .scaledToFit()
+                                        .foregroundColor(.blue.opacity(0.85))
+                                        .frame(width: 36, height: 36)
+                                }
+
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(friend.name)
+                                        .font(.body.weight(.semibold))
+                                        .foregroundColor(.primary)
+
+                                    if !friend.email.isEmpty {
+                                        Text(friend.email)
+                                            .font(.caption)
+                                            .foregroundColor(.secondary)
+                                            .lineLimit(1)
+                                    }
+                                }
+
+                                Spacer()
+
+                                Image(systemName: selectedFriend?.id == friend.id ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(selectedFriend?.id == friend.id ? .blue : .secondary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .listStyle(.plain)
+                }
+
+                VStack(spacing: 10) {
+                    HStack {
+                        Text(selectedFriend == nil ? "Select a recipient" : "To: \(selectedFriend?.name ?? "")")
+                            .font(.footnote)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+
+                    HStack(spacing: 10) {
+                        TextField("Write a message...", text: $draftMessage)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(Color(.secondarySystemBackground))
+                            .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            .textInputAutocapitalization(.sentences)
+                            .submitLabel(.send)
+                            .onSubmit {
+                                send()
+                            }
+
+                        Button(action: send) {
+                            if viewModel.isSending {
+                                ProgressView()
+                                    .tint(.white)
+                                    .frame(width: 20, height: 20)
+                            } else {
+                                Image(systemName: "paperplane.fill")
+                                    .font(.system(size: 15, weight: .semibold))
+                            }
+                        }
+                        .foregroundColor(.white)
+                        .frame(width: 40, height: 40)
+                        .background(canSend ? Color.blue : Color.gray)
+                        .clipShape(Circle())
+                        .disabled(!canSend)
+                    }
+
+                    if let error = viewModel.errorMessage {
+                        Text(error)
+                            .font(.footnote)
+                            .foregroundColor(.red)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(Color(.systemBackground))
+            }
+            .navigationTitle("New Message")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Close") {
+                        dismiss()
+                    }
+                }
+
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        viewModel.loadFriends()
+                    } label: {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    .accessibilityLabel("Refresh friends")
+                }
+            }
+            .onAppear {
+                viewModel.loadFriends()
+            }
+        }
+    }
+
+    private func send() {
+        guard let friend = selectedFriend else {
+            return
+        }
+
+        let text = draftMessage.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !text.isEmpty else {
+            return
+        }
+
+        viewModel.sendMessage(text, to: friend) { success in
+            if success {
+                onMessageSent()
+                dismiss()
+            }
+        }
+    }
+}
+
 struct ArticleShareSheet: View {
     let article: Article
 
@@ -841,6 +1105,9 @@ struct ArticleShareSheet: View {
                     }
                 }
                 .listStyle(.plain)
+                .refreshable {
+                    viewModel.loadFriends()
+                }
             }
         }
         .navigationTitle("Share Article")
